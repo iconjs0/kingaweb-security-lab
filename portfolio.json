@@ -1,1 +1,14 @@
-portfolio.json
+{
+  "title": "KingaWeb Security Lab",
+  "subtitle": "Controlled Security Testing & Validation Environment",
+  "category": "SECURITY LAB",
+  "status": "ACTIVE DEVELOPMENT",
+  "summary": "A controlled environment supporting KingaWeb security experimentation, validation and defensive testing without intrusive testing against unauthorized systems.",
+  "workstreams": [
+    "Authentication and authorization testing",
+    "Input-validation scenarios",
+    "HTTP security-control validation",
+    "API security testing",
+    "Session and identity boundaries"
+  ]
+}
