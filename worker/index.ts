@@ -29,6 +29,19 @@ const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
+    if (url.pathname === "/.well-known/kingaweb-verification.txt") {
+      return new Response(
+        "kingaweb-verification=kingaweb-security-lab-authorized-test\n",
+        {
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Cache-Control": "public, max-age=60",
+            "X-Content-Type-Options": "nosniff",
+          },
+        },
+      );
+    }
+
     if (url.pathname === "/_vinext/image") {
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
       return handleImageOptimization(request, {
