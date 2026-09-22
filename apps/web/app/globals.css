@@ -1,0 +1,54 @@
+@import "@kingaweb/design-system/tokens.css";
+
+.hero {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: var(--sp-8);
+  padding: var(--sp-12) 0 var(--sp-8);
+}
+@media (max-width: 860px) {
+  .hero { grid-template-columns: 1fr; }
+}
+.hero h1 {
+  font-size: var(--fs-1);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin: 0 0 var(--sp-4);
+}
+.lede { color: var(--text-2); font-size: var(--fs-3); max-width: 34rem; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-4); }
+@media (max-width: 860px) {
+  .grid-2, .grid-3 { grid-template-columns: 1fr; }
+}
+.stack { display: grid; gap: var(--sp-4); }
+.rail-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: var(--sp-4);
+  align-items: start;
+}
+@media (max-width: 960px) {
+  .rail-layout { grid-template-columns: 1fr; }
+}
+.workspace {
+  display: grid;
+  grid-template-columns: 300px 1fr 320px;
+  gap: var(--sp-4);
+  align-items: start;
+}
+@media (max-width: 1200px) {
+  .workspace { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 860px) {
+  .workspace { grid-template-columns: 1fr; }
+}
+.toolbar { display: flex; gap: var(--sp-2); flex-wrap: wrap; align-items: center; }
+.toolbar .input { width: auto; }
+.kicker {
+  font-size: var(--fs-small);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  font-weight: 700;
+}

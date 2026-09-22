@@ -5,6 +5,7 @@ dist/
 build/
 .next/
 out/
+*.tsbuildinfo
 
 # python
 __pycache__/
