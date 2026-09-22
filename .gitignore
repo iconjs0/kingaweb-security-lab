@@ -1,0 +1,31 @@
+# deps
+node_modules/
+.pnp.*
+dist/
+build/
+.next/
+out/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# env / secrets — never commit real secrets
+.env
+.env.local
+*.pem
+*.key
+
+# data
+postgres-data/
+redis-data/
+s3-data/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json

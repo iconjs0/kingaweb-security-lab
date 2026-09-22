@@ -1,0 +1,18 @@
+{
+  "name": "kingaweb-security-lab",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Authorized web/API security training platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "validate": "npm run validate:manifests && npm run validate:contracts",
+    "validate:manifests": "python3 packages/lab-sdk/validate.py labs/",
+    "validate:contracts": "node packages/contracts/validate.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
