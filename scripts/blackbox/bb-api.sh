@@ -2,8 +2,11 @@
 # Blackbox: control-plane API. No source imports, only HTTP.
 # Usage: ./scripts/blackbox/bb-api.sh [base_url]
 # Requires: compose stack up (./scripts/blackbox/bb-docker.sh), .env present.
+# Launches real isolated containers via the orchestrator (~10s per launch).
 set -u
 BASE="${1:-http://localhost:8000}"
+LAB="mpesa-bola-01@0.1.0"
+OBJ="read-foreign-balance"
 PASS=0; FAIL=0
 ok()   { PASS=$((PASS+1)); echo "PASS: $1"; }
 bad()  { FAIL=$((FAIL+1)); echo "FAIL: $1${2:+ — $2}"; }
@@ -22,22 +25,25 @@ AT=$(curl -s -X POST "$BASE/v1/auth/login" -H 'Content-Type: application/json' -
 LABS=$(curl -s "$BASE/v1/labs" -H "Authorization: Bearer $LT")
 echo "$LABS" | grep -q web-idor-01 && echo "$LABS" | grep -q mpesa-bola-01 && ok "catalogue seeded (2 labs)" || bad "catalogue seeded" "$LABS"
 
-S1=$(curl -s -X POST "$BASE/v1/sessions" -H "Authorization: Bearer $LT" -H 'Content-Type: application/json' -H 'Idempotency-Key: bb-1' -d '{"lab":"web-idor-01@0.1.0"}' | jget "['id']")
-S2=$(curl -s -X POST "$BASE/v1/sessions" -H "Authorization: Bearer $LT" -H 'Content-Type: application/json' -H 'Idempotency-Key: bb-1' -d '{"lab":"web-idor-01@0.1.0"}' | jget "['id']")_
+S1=$(curl -s -X POST "$BASE/v1/sessions" -H "Authorization: Bearer $LT" -H 'Content-Type: application/json' -H 'Idempotency-Key: bb-1' -d "{\"lab\":\"$LAB\"}" | jget "['id']")
+S2=$(curl -s -X POST "$BASE/v1/sessions" -H "Authorization: Bearer $LT" -H 'Content-Type: application/json' -H 'Idempotency-Key: bb-1' -d "{\"lab\":\"$LAB\"}" | jget "['id']")_
 [ -n "$S1" ] && [ "$S1" = "${S2%_}" ] && ok "idempotent launch ($S1)" || bad "idempotent launch" "$S1 vs $S2"
 [ "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/v1/sessions/$S1" -H "Authorization: Bearer $IT")" = "403" ] && ok "cross-user session 403" || bad "cross-user session"
 [ "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/v1/sessions/$S1" -H "Authorization: Bearer $LT")" = "200" ] && ok "owner session 200" || bad "owner session"
 
-W=$(curl -s -X POST "$BASE/v1/sessions/$S1/submissions" -H "Authorization: Bearer $LT" -H 'Content-Type: application/json' -d '{"objective_id":"read-other-order","flag":"KW{wrong}"}' | jget "['correct']")
+W=$(curl -s -X POST "$BASE/v1/sessions/$S1/submissions" -H "Authorization: Bearer $LT" -H 'Content-Type: application/json' -d "{\"objective_id\":\"$OBJ\",\"flag\":\"KW{wrong}\"}" | jget "['correct']")
 [ "$W" = "False" ] && ok "wrong flag rejected" || bad "wrong flag" "$W"
-FLAG=$(curl -s -X POST "$BASE/v1/dev/mint?session_id=$S1&objective_id=read-other-order" -H "Authorization: Bearer $LT" | jget "['flag']") || FLAG=""
-G=$(curl -s -X POST "$BASE/v1/sessions/$S1/submissions" -H "Authorization: Bearer $LT" -H 'Content-Type: application/json' -d "{\"objective_id\":\"read-other-order\",\"flag\":\"$FLAG\",\"remediation_done\":true}")
+FLAG=$(curl -s -X POST "$BASE/v1/dev/mint?session_id=$S1&objective_id=$OBJ" -H "Authorization: Bearer $LT" | jget "['flag']") || FLAG=""
+G=$(curl -s -X POST "$BASE/v1/sessions/$S1/submissions" -H "Authorization: Bearer $LT" -H 'Content-Type: application/json' -d "{\"objective_id\":\"$OBJ\",\"flag\":\"$FLAG\",\"remediation_done\":true}")
 echo "$G" | grep -q '"correct":true' && ok "HMAC flag roundtrip + scored" || bad "flag roundtrip" "$G"
-curl -s "$BASE/v1/progress" -H "Authorization: Bearer $LT" | grep -q '"solves":1' && ok "progress counts solve" || bad "progress"
+curl -s "$BASE/v1/progress" -H "Authorization: Bearer $LT" | grep -Eq '"solves":[1-9]' && ok "progress counts solve" || bad "progress"
+
+REF=$(curl -s -X POST "$BASE/v1/sessions" -H "Authorization: Bearer $LT" -H 'Content-Type: application/json' -d '{"lab":"web-idor-01@0.1.0"}')
+echo "$REF" | grep -q "refused" && ok "unpinned image refused (policy)" || bad "policy refuse" "$REF"
 
 [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/v1/sessions/$S1/requests" -H "Authorization: Bearer $LT" -H 'Content-Type: application/json' -d '{"method":"GET","host":"169.254.169.254","path":"/"}')" = "403" ] && ok "console SSRF host denied" || bad "console SSRF"
-ALLOW=$(curl -s -X POST "$BASE/v1/sessions/$S1/requests" -H "Authorization: Bearer $LT" -H 'Content-Type: application/json' -d '{"method":"GET","host":"shop","path":"/nope"}' -o /dev/null -w '%{http_code}')
-[ "$ALLOW" = "502" ] && ok "console allowlist forwards (shop unreachable in dev = 502, not 403)" || bad "console allowlist" "$ALLOW"
+RELAY=$(curl -s -X POST "$BASE/v1/sessions/$S1/requests" -H "Authorization: Bearer $LT" -H 'Content-Type: application/json' -d '{"method":"GET","host":"127.0.0.1","path":"/rates"}')
+echo "$RELAY" | grep -q '"status":200' && echo "$RELAY" | grep -q KES && ok "console relay forwards to session target" || bad "console relay" "$RELAY"
 
 [ "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/v1/audit" -H "Authorization: Bearer $LT")" = "403" ] && ok "audit learner-denied" || bad "audit RBAC"
 [ "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/v1/audit" -H "Authorization: Bearer $AT")" = "200" ] && ok "audit admin-visible" || bad "audit admin"
