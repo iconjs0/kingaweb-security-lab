@@ -84,8 +84,12 @@ def provision(body: ProvisionIn, _=Depends(authed)):
         cli = dockerx.client()
     except Exception as e:
         raise HTTPException(503, f"docker unavailable: {e}")
+    # register lease BEFORE touching docker: the reaper/reconcile would
+    # otherwise garbage-collect our containers mid-provisioning
+    store.upsert(body.session_id, f"{body.lab_slug}@{body.lab_version}", ttl, [])
     dockerx.destroy_session(cli, body.session_id)  # idempotent re-provision
     store.drop(body.session_id, "reprovision")  # closes any stale relays
+    store.upsert(body.session_id, f"{body.lab_slug}@{body.lab_version}", ttl, [])
     net = dockerx.create_network(cli, body.session_id)
     exposed = []
     relays = []
@@ -105,7 +109,10 @@ def provision(body: ProvisionIn, _=Depends(authed)):
             first_port = int(t["ports"][0]) if t.get("ports") else 80
             if not dockerx.wait_ready(f"http://{ip}:{first_port}{hpath}"):
                 raise RuntimeError(f"readiness failed for {t['name']}")
-            srv, rport = relay_mod.start("127.0.0.1", ip, first_port)
+            # NOTE (local dev): relays bind 0.0.0.0 so the API container can reach
+            # them via the bridge gateway; learners use 127.0.0.1. Bind to a
+            # firewall or Tailnet in shared environments. Prod uses ingress.
+            srv, rport = relay_mod.start("0.0.0.0", ip, first_port)
             relays.append(srv)
             exposed.append({"name": t["name"], "url": f"http://127.0.0.1:{rport}{hpath}",
                             "host": "127.0.0.1", "port": rport, "dev_digest": t["dev_digest"]})
@@ -113,6 +120,7 @@ def provision(body: ProvisionIn, _=Depends(authed)):
         for srv in relays:
             relay_mod.stop(srv)
         dockerx.destroy_session(cli, body.session_id)
+        store.drop(body.session_id, "provision-failed")
         raise HTTPException(502, f"provision failed: {e}")
     store.add_relays(body.session_id, relays)
     exp = store.upsert(body.session_id, f"{body.lab_slug}@{body.lab_version}", ttl, exposed)
