@@ -41,6 +41,11 @@ services:
       FLAG_HMAC_SECRET: ${FLAG_HMAC_SECRET:?set FLAG_HMAC_SECRET in .env}
       ALLOW_DEV_MINT: "true" # local only — production overlay forces false
       LABS_ROOT: /labs
+      ORCHESTRATOR_URL: http://host.docker.internal:8001
+      ORCHESTRATOR_TOKEN: ${ORCHESTRATOR_TOKEN:?set ORCHESTRATOR_TOKEN in .env}
+      RELAY_HOST: host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     env_file:
       - path: ../../.env
         required: false
@@ -51,6 +56,30 @@ services:
     networks: [default, labnet]
     healthcheck:
       test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/healthz\")'"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  orchestrator:
+    build: ../../services/orchestrator
+    restart: unless-stopped
+    # Host mode (local only): relays bind host loopback for learner tools.
+    # Sole holder of the Docker socket — api/web never mount it.
+    network_mode: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../../labs:/labs:ro
+    environment:
+      ORCHESTRATOR_TOKEN: ${ORCHESTRATOR_TOKEN:?set ORCHESTRATOR_TOKEN in .env}
+      ALLOW_UNSIGNED_MANIFESTS: "true" # local only — production requires signatures
+      ALLOW_DEV_DIGESTS: "true" # local only — production requires pinned digests
+      LABS_ROOT: /labs
+      ORCH_ALLOWLIST: local-mpesa-mock
+    env_file:
+      - path: ../../.env
+        required: false
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8001/healthz\")'"]
       interval: 10s
       timeout: 3s
       retries: 10
