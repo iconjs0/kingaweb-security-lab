@@ -33,3 +33,21 @@ jobs:
       - run: npm install
       - run: npm run typecheck --workspace=web
       - run: npm run build --workspace=web
+  orchestrator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r services/orchestrator/requirements.txt
+      - run: python -m pytest services/orchestrator/tests/test_policy.py -q
+        working-directory: services/orchestrator
+        env:
+          ALLOW_UNSIGNED_MANIFESTS: "true"
+          ALLOW_DEV_DIGESTS: "true"
+      - run: docker build -t local-mpesa-mock labs/mocks/mpesa
+      - run: python -m pytest services/orchestrator/tests/test_isolation.py -q
+        working-directory: services/orchestrator
+        env:
+          ALLOW_UNSIGNED_MANIFESTS: "true"
+          ALLOW_DEV_DIGESTS: "true"
