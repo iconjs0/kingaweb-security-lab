@@ -14,7 +14,7 @@ from .auth import current_user, login_dev, require_roles
 from .db import get_db
 from . import orch as orch_client
 from .flags import flag_hash, mint_flag, new_seed_hex, score_solve, verify_flag
-from .models import Audit, Competition, Enrollment, Lab, Membership, Session, Submission, Team, User
+from .models import Audit, Competition, Enrollment, Lab, Membership, Session, Submission, Team, User, HintUnlock
 
 router = APIRouter()
 _attempts: dict[str, list[float]] = {}  # session_id -> submit timestamps (rate limit)
@@ -64,12 +64,16 @@ def get_lab(slug: str, db: DBSession = Depends(get_db), user: User = Depends(cur
     return {"slug": l.slug, "version": l.version, "title": l.title, "summary": l.summary,
             "track": l.track, "difficulty": l.difficulty, "time_minutes": l.time_minutes,
             "ttl_minutes": l.ttl_minutes, "objectives": json.loads(l.objectives_json),
-            "targets": json.loads(l.targets_json)}
+            "targets": json.loads(l.targets_json),
+            "hint_levels": [{"level": h["level"], "cost": h["cost"]} for h in json.loads(l.hints_json or "[]")]}
 
 # ---- sessions ----
+MODES = ("guided", "challenge", "assessment", "demo")
+
 class LaunchIn(BaseModel):
     lab: str = Field(pattern=r"^[a-z0-9-]+@[0-9.]+$")
     competition_id: str | None = None
+    mode: str = "guided"
 
 def _targets_for(lab: Lab) -> list[dict]:
     return json.loads(lab.targets_json)
@@ -79,6 +83,12 @@ def launch(body: LaunchIn, db: DBSession = Depends(get_db), user: User = Depends
            idempotency_key: str | None = Header(default=None, alias="Idempotency-Key")):
     slug, version = body.lab.split("@", 1)
     lab = lab_or_404(db, slug, version)
+    mode = (body.mode or "guided").lower()
+    if mode not in MODES:
+        raise HTTPException(422, f"mode must be one of {list(MODES)}")
+    ttl = lab.ttl_minutes
+    if mode == "assessment":
+        ttl = min(ttl, 30)
     if idempotency_key:
         dup = db.query(Session).filter(Session.owner_id == user.id, Session.idempotency_key == idempotency_key).first()
         if dup:
@@ -87,15 +97,15 @@ def launch(body: LaunchIn, db: DBSession = Depends(get_db), user: User = Depends
     now = datetime.now(timezone.utc)
     s = Session(id=sid, owner_id=user.id, lab_slug=lab.slug, lab_version=lab.version,
                 seed_hex=new_seed_hex(), status="active", competition_id=body.competition_id,
-                idempotency_key=idempotency_key, targets_json="[]",
-                expires_at=now + timedelta(minutes=lab.ttl_minutes))
+                idempotency_key=idempotency_key, targets_json="[]", mode=mode, finalized=0,
+                expires_at=now + timedelta(minutes=ttl))
     db.add(s)
     db.commit()
     targets: list[dict] = _targets_for(lab)
     provisioned = False
     if orch_client.base():
         try:
-            code, resp = orch_client.provision(sid, lab.slug, lab.version, lab.ttl_minutes)
+            code, resp = orch_client.provision(sid, lab.slug, lab.version, ttl)
             if code in (200, 201):
                 targets = resp.get("targets", targets)
                 s.targets_json = json.dumps(targets)
@@ -114,7 +124,7 @@ def launch(body: LaunchIn, db: DBSession = Depends(get_db), user: User = Depends
     else:
         audit(db, user.id, "session.launch", sid)
         db.commit()
-    return {"id": sid, "lab": f"{lab.slug}@{lab.version}", "status": "active",
+    return {"id": sid, "lab": f"{lab.slug}@{lab.version}", "status": "active", "mode": mode,
             "expires_at": s.expires_at.isoformat(), "targets": targets, "provisioned": provisioned}
 
 @router.get("/v1/sessions/{sid}")
@@ -125,13 +135,14 @@ def get_session(sid: str, db: DBSession = Depends(get_db), user: User = Depends(
     except Exception:
         targets = []
     return {"id": s.id, "lab": f"{s.lab_slug}@{s.lab_version}", "status": s.status,
+            "mode": getattr(s, "mode", "guided"), "finalized": bool(getattr(s, "finalized", 0)),
             "expires_at": s.expires_at.isoformat() if s.expires_at else None, "targets": targets}
 
 @router.post("/v1/sessions/{sid}/extend")
 def extend(sid: str, db: DBSession = Depends(get_db), user: User = Depends(current_user)):
     s = own_session(db, sid, user)
-    if s.status != "active":
-        raise HTTPException(409, "only active sessions extend")
+    if s.status != "active" or getattr(s, "finalized", 0):
+        raise HTTPException(409, "only active, unfinalized sessions extend")
     minutes = 30
     exp = s.expires_at if getattr(s.expires_at, "tzinfo", None) else s.expires_at.replace(tzinfo=timezone.utc)
     s.expires_at = exp + timedelta(minutes=minutes)
@@ -147,6 +158,8 @@ def extend(sid: str, db: DBSession = Depends(get_db), user: User = Depends(curre
 @router.post("/v1/sessions/{sid}/reset")
 def reset(sid: str, db: DBSession = Depends(get_db), user: User = Depends(current_user)):
     s = own_session(db, sid, user)
+    if getattr(s, "finalized", 0):
+        raise HTTPException(409, "finalized sessions cannot reset")
     s.seed_hex = new_seed_hex()  # flags rotate; destroy+recreate semantics
     s.status = "active"
     if orch_client.base():
@@ -187,8 +200,8 @@ class SubmitIn(BaseModel):
 @router.post("/v1/sessions/{sid}/submissions")
 def submit(sid: str, body: SubmitIn, db: DBSession = Depends(get_db), user: User = Depends(current_user)):
     s = own_session(db, sid, user)
-    if s.status != "active":
-        raise HTTPException(409, "session not active")
+    if s.status != "active" or getattr(s, "finalized", 0):
+        raise HTTPException(409, "session not active or already finalized")
     now = time.time()
     hist = [t for t in _attempts.get(sid, []) if now - t < 60]
     if len(hist) >= 5:
@@ -201,16 +214,61 @@ def submit(sid: str, body: SubmitIn, db: DBSession = Depends(get_db), user: User
         raise HTTPException(404, "unknown objective")
     ok = verify_flag(body.flag, s.id, s.lab_version, body.objective_id, s.seed_hex)
     attempts = db.query(Submission).filter(Submission.session_id == sid, Submission.objective_id == body.objective_id).count() + 1
+    hint_cost = sum(u.cost for u in db.query(HintUnlock).filter(HintUnlock.session_id == sid).all())
     points = 0
     if ok:
         solves_before = db.query(Submission).filter(Submission.objective_id == body.objective_id, Submission.correct == 1).count()
         first = solves_before == 0
-        points = score_solve(400, solves_before, attempts=attempts, first_blood=first, remediation=body.remediation_done)
+        points = score_solve(400, solves_before, hint_cost=hint_cost, attempts=attempts,
+                             first_blood=first, remediation=body.remediation_done)
     db.add(Submission(session_id=sid, objective_id=body.objective_id, flag_hash=flag_hash(body.flag),
                       correct=1 if ok else 0, points=points))
     audit(db, user.id, f"submit.{'ok' if ok else 'fail'}", f"{sid}:{body.objective_id}")
     db.commit()
-    return {"correct": ok, "points": points, "attempts": attempts}
+    return {"correct": ok, "points": points, "attempts": attempts, "hint_cost": hint_cost}
+
+# ---- hints (staged unlocks, sequential, cost deducted from score) ----
+@router.post("/v1/sessions/{sid}/hints/unlock")
+def unlock_hint(sid: str, db: DBSession = Depends(get_db), user: User = Depends(current_user)):
+    s = own_session(db, sid, user)
+    if s.status != "active" or getattr(s, "finalized", 0):
+        raise HTTPException(409, "session not active or already finalized")
+    if getattr(s, "mode", "guided") == "demo":
+        hints = json.loads(lab_or_404(db, s.lab_slug, s.lab_version).hints_json or "[]")
+        return {"level": 0, "text": "Demo mode: all hints free. " + (hints[0]["text"] if hints else ""), "cost": 0, "free": True}
+    done = db.query(HintUnlock).filter(HintUnlock.session_id == sid).count()
+    if getattr(s, "mode", "guided") == "assessment" and done >= 1:
+        raise HTTPException(403, "assessment allows at most 1 hint")
+    hints = sorted(json.loads(lab_or_404(db, s.lab_slug, s.lab_version).hints_json or "[]"), key=lambda h: h["level"])
+    if done >= len(hints):
+        raise HTTPException(404, "no further hints")
+    nxt = hints[done]
+    db.add(HintUnlock(session_id=sid, level=nxt["level"], cost=nxt["cost"]))
+    audit(db, user.id, "hint.unlock", f"{sid}:L{nxt['level']}")
+    db.commit()
+    return {"level": nxt["level"], "text": nxt["text"], "cost": nxt["cost"]}
+
+# ---- finalize (assessment lock; immutable scoring) ----
+@router.post("/v1/sessions/{sid}/finalize")
+def finalize(sid: str, db: DBSession = Depends(get_db), user: User = Depends(current_user)):
+    s = own_session(db, sid, user)
+    if getattr(s, "finalized", 0):
+        raise HTTPException(409, "already finalized")
+    if s.status != "active":
+        raise HTTPException(409, "session not active")
+    subs = db.query(Submission).filter(Submission.session_id == sid, Submission.correct == 1).all()
+    hints = sum(u.cost for u in db.query(HintUnlock).filter(HintUnlock.session_id == sid).all())
+    gross = sum(x.points for x in subs)
+    time_bonus = 0
+    if getattr(s, "mode", "guided") == "assessment":
+        lab = lab_or_404(db, s.lab_slug, s.lab_version)
+        used_min = (datetime.now(timezone.utc) - s.created_at.replace(tzinfo=timezone.utc)).total_seconds() / 60
+        time_bonus = max(0, min(20, int(lab.time_minutes - used_min)))
+    s.finalized = 1
+    audit(db, user.id, "session.finalize", sid)
+    db.commit()
+    return {"session": sid, "solves": len(subs), "gross": gross, "hint_cost": hints,
+            "time_bonus": time_bonus, "net": gross + time_bonus, "immutable": True}
 
 # ---- safe console proxy (Phase 7 lite): allowlist + forward to session mocks ----
 ALLOWED_HOSTS = {"mpesa-mock": "http://mpesa-mock:5009", "shop": "http://shop:8080"}
@@ -271,8 +329,11 @@ def proxy(sid: str, body: ProxyIn, db: DBSession = Depends(get_db), user: User =
 @router.get("/v1/progress")
 def progress(db: DBSession = Depends(get_db), user: User = Depends(current_user)):
     subs = db.query(Submission).join(Session, Submission.session_id == Session.id).filter(Session.owner_id == user.id).all()
+    sess_ids = {s.session_id for s in subs}
+    hints = sum(u.cost for u in db.query(HintUnlock).filter(HintUnlock.session_id.in_(sess_ids)).all()) if sess_ids else 0
     return {"user": user.email, "solves": sum(1 for x in subs if x.correct),
-            "points": sum(x.points for x in subs), "attempts": len(subs)}
+            "points": sum(x.points for x in subs), "hint_cost": hints,
+            "net": sum(x.points for x in subs), "attempts": len(subs)}
 
 # ---- teams ----
 class TeamIn(BaseModel):

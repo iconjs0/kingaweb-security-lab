@@ -41,6 +41,10 @@ def seed_labs(db: DBSession, labs_root: str = "labs") -> int:
                 {"name": t.get("name"), "ports": t.get("ports", []),
                  "allow_host": t.get("name")}
                 for t in d.get("targets", [])]),
+            hints_json=json.dumps([
+                {"level": int(h.get("level", i + 1)), "text": h.get("text", ""),
+                 "cost": int(h.get("cost", 0))}
+                for i, h in enumerate(d.get("hints", []))]),
         )
         if row:
             for k, v in vals.items():

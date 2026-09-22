@@ -34,6 +34,7 @@ class Lab(Base):
     ttl_minutes: Mapped[int] = mapped_column(Integer, default=60)
     objectives_json: Mapped[str] = mapped_column(Text, default="[]")
     targets_json: Mapped[str] = mapped_column(Text, default="[]")
+    hints_json: Mapped[str] = mapped_column(Text, default="[]")  # [{level,text,cost}]
 
 class Session(Base):
     __tablename__ = "sessions"
@@ -46,6 +47,8 @@ class Session(Base):
     competition_id: Mapped[str] = mapped_column(String(64), nullable=True)
     idempotency_key: Mapped[str] = mapped_column(String(128), nullable=True)
     targets_json: Mapped[str] = mapped_column(Text, default="[]")  # orchestrator connection details
+    mode: Mapped[str] = mapped_column(String(32), default="guided")
+    finalized: Mapped[int] = mapped_column(Integer, default=0)
     expires_at: Mapped[str] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -71,6 +74,14 @@ class Enrollment(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     competition_id: Mapped[str] = mapped_column(String(64), index=True)
     user_id: Mapped[str] = mapped_column(String(64), index=True)
+
+class HintUnlock(Base):
+    __tablename__ = "hint_unlocks"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(String(64), index=True)
+    level: Mapped[int] = mapped_column(Integer)
+    cost: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 class Audit(Base):
     __tablename__ = "audit"
