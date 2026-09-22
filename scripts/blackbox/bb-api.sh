@@ -25,8 +25,9 @@ AT=$(curl -s -X POST "$BASE/v1/auth/login" -H 'Content-Type: application/json' -
 LABS=$(curl -s "$BASE/v1/labs" -H "Authorization: Bearer $LT")
 echo "$LABS" | grep -q web-idor-01 && echo "$LABS" | grep -q mpesa-bola-01 && ok "catalogue seeded (2 labs)" || bad "catalogue seeded" "$LABS"
 
-S1=$(curl -s -X POST "$BASE/v1/sessions" -H "Authorization: Bearer $LT" -H 'Content-Type: application/json' -H 'Idempotency-Key: bb-1' -d "{\"lab\":\"$LAB\"}" | jget "['id']")
-S2=$(curl -s -X POST "$BASE/v1/sessions" -H "Authorization: Bearer $LT" -H 'Content-Type: application/json' -H 'Idempotency-Key: bb-1' -d "{\"lab\":\"$LAB\"}" | jget "['id']")_
+KEY="bb-$(date +%s)"
+S1=$(curl -s -X POST "$BASE/v1/sessions" -H "Authorization: Bearer $LT" -H 'Content-Type: application/json' -H "Idempotency-Key: $KEY" -d "{\"lab\":\"$LAB\"}" | jget "['id']")
+S2=$(curl -s -X POST "$BASE/v1/sessions" -H "Authorization: Bearer $LT" -H 'Content-Type: application/json' -H "Idempotency-Key: $KEY" -d "{\"lab\":\"$LAB\"}" | jget "['id']")_
 [ -n "$S1" ] && [ "$S1" = "${S2%_}" ] && ok "idempotent launch ($S1)" || bad "idempotent launch" "$S1 vs $S2"
 [ "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/v1/sessions/$S1" -H "Authorization: Bearer $IT")" = "403" ] && ok "cross-user session 403" || bad "cross-user session"
 [ "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/v1/sessions/$S1" -H "Authorization: Bearer $LT")" = "200" ] && ok "owner session 200" || bad "owner session"
