@@ -1,0 +1,49 @@
+apiVersion: lab.kingaweb.io/v1
+kind: Lab
+metadata:
+  id: mpesa-bola-01
+  slug: mpesa-bola-01
+  version: 0.1.0
+  title: "M-Pesa Mock: BOLA + Callback Forgery"
+  summary: "TZ-local API lab: enforce account binding and callback HMAC on a mock mobile-money API."
+  difficulty: intermediate
+  timeMinutes: 60
+  author: "platform"
+  reviewer: "tbd"
+tracks: [api, tz-local]
+owasp:
+  web: []
+  api: ["API1:2023-BOLA", "API8:2023-Security Misconfiguration"]
+cwe: [639, 347]
+prerequisites: [http-foundations, api-auth-basics]
+topology: "single mock container: mpesa-mock (in-memory, no egress)"
+targets:
+  - name: mpesa-mock
+    image: "local/kingaweb-mpesa-mock@sha256:LOCAL_BUILD"
+    ports: [5009]
+    healthcheck: { path: /healthz, port: 5009, timeoutSeconds: 5 }
+    resources: { cpu: "0.25", memory: "128Mi", pids: 32, diskMb: 128 }
+    readonlyFs: true
+network: { egress: deny, allowMocks: [mpesa-mock] }
+session: { ttlMinutes: 60, maxExtendOnceMinutes: 15 }
+objectives:
+  - id: read-foreign-balance
+    title: "Read another account balance via BOLA on /c2b/validate"
+    flag: { validator: hmac, objectiveId: read-foreign-balance }
+    evidenceRequired: true
+  - id: forge-callback
+    title: "Forge STK callback without valid HMAC"
+    flag: { validator: hmac, objectiveId: forge-callback }
+    evidenceRequired: true
+hints:
+  - { level: 1, text: "Try changing `account` to 255700000002...", cost: 5 }
+  - { level: 2, text: "Replay /stk/callback with empty X-Mock-Signature...", cost: 15 }
+remediation: { summary: "Bind account to session user; enforce HMAC on callback.", retest: "Foreign account → 403; bad signature → rejected." }
+blueTeam:
+  logBundle: "blue-team.json"
+  detectionGoal: "Alert on foreign-account 200s and unsigned callbacks"
+  sampleQuerySplunk: 'index=lab sourcetype=mpesa_mock account!=auth_user status=200 | stats count by account'
+tutorPolicy: { guidedMaxLevel: 2, challengeDiscloses: methodology-only, assessmentDiscloses: none }
+i18n: { en: "i18n/en.json", sw: "i18n/sw.json" }
+ctf: { basePoints: 400, floor: 100, firstBloodBonus: true }
+resetStrategy: recreate

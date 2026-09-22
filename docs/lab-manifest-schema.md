@@ -1,4 +1,6 @@
-# Lab Manifest Schema (v0.1 draft)
+# Lab Manifest Schema (v0.2 — adds docker-feature blocks)
+
+All manifests: `labs/<track>/<slug>/lab.yaml`, semver immutable. Signed before publish (Phase 3). v0.2 adds optional `ctf`, `blueTeam`, `tutorPolicy`, `i18n` (see docs/ctf-competition-mode.md, blue-team-companion.md, ai-tutor-guardrails.md, tz-local-track.md).
 
 All manifests: `labs/<track>/<slug>/lab.yaml`, semver immutable. Signed before publish (Phase 3).
 

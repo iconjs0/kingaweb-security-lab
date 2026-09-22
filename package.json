@@ -8,8 +8,9 @@
     "packages/*"
   ],
   "scripts": {
-    "validate": "npm run validate:manifests && npm run validate:contracts",
+    "validate": "npm run validate:manifests && npm run validate:contracts && npm run validate:scoring",
     "validate:manifests": "python3 packages/lab-sdk/validate.py labs/",
+    "validate:scoring": "python3 packages/lab-sdk/test_scoring.py",
     "validate:contracts": "node packages/contracts/validate.mjs"
   },
   "engines": {

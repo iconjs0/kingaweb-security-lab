@@ -1,8 +1,12 @@
 {
   "openapi": "3.1.0",
-  "info": { "title": "KingaWeb Security Lab API", "version": "0.1.0" },
+  "info": { "title": "KingaWeb Security Lab API", "version": "0.2.0" },
   "paths": {
     "/v1/labs": { "get": { "summary": "List labs (Phase 2)" } },
-    "/v1/sessions": { "post": { "summary": "Launch session (Phase 2)" } }
+    "/v1/sessions": { "post": { "summary": "Launch session (Phase 2)" } },
+    "/v1/competitions": { "post": { "summary": "Create competition (CTF mode)" } },
+    "/v1/competitions/{id}/join": { "post": { "summary": "Join competition" } },
+    "/v1/competitions/{id}/leaderboard": { "get": { "summary": "Leaderboard (freeze-aware)" } },
+    "/v1/tutor/hint": { "post": { "summary": "Guardrailed hint (mode-enforced, no flags)" } }
   }
 }

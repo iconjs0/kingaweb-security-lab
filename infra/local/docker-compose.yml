@@ -30,6 +30,35 @@ services:
       timeout: 3s
       retries: 10
 
+  tutor-stub:
+    build: ../../services/tutor
+    restart: unless-stopped
+    ports:
+      - "5008:5008"
+    networks: [labnet]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5008/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  mpesa-mock:
+    build: ../../labs/mocks/mpesa
+    restart: unless-stopped
+    environment:
+      MPESA_CALLBACK_SECRET: ${FLAG_HMAC_SECRET:-dev-only-mock-secret}
+    ports:
+      - "5009:5009"
+    networks: [labnet]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5009/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+networks:
+  labnet:
+
 volumes:
   postgres-data:
   redis-data:
