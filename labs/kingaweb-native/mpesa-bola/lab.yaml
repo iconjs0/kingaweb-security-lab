@@ -38,6 +38,10 @@ objectives:
 hints:
   - { level: 1, text: "Try changing `account` to 255700000002...", cost: 5 }
   - { level: 2, text: "Replay /stk/callback with empty X-Mock-Signature...", cost: 15 }
+guidedSteps:
+  - { checkpoint: map, title: "Map money endpoints", body: "List /c2b/validate and /stk/callback; note the account binding." }
+  - { checkpoint: test, title: "Test BOLA then forgery", body: "Swap account to 255700000002; replay callback unsigned. Save both responses." }
+  - { checkpoint: fix, title: "Remediate", body: "Bind account server-side; verify callback HMAC; retest both." }
 remediation: { summary: "Bind account to session user; enforce HMAC on callback.", retest: "Foreign account → 403; bad signature → rejected." }
 blueTeam:
   logBundle: "blue-team.json"

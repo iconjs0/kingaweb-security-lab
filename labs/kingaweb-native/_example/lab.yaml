@@ -33,5 +33,10 @@ objectives:
     evidenceRequired: true
 hints:
   - { level: 1, text: "Compare order URLs...", cost: 5 }
+  - { level: 2, text: "Replay a foreign ID in Repeater and compare status codes...", cost: 15 }
+guidedSteps:
+  - { checkpoint: map, title: "Map order endpoints", body: "List /orders/:id routes; note which IDs belong to you." }
+  - { checkpoint: test, title: "Test authorization", body: "Replay a foreign ID; record 200 vs 403 as evidence." }
+  - { checkpoint: fix, title: "Remediate", body: "Enforce server-side ownership check; retest for 403." }
 remediation: { summary: "Server-side authz check.", retest: "Expect 403." }
 resetStrategy: recreate

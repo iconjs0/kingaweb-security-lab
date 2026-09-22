@@ -1,4 +1,4 @@
-"""Manifest validator v0.2: checks core + docker-feature additions (ctf/blueTeam/tutor/i18n)."""
+"""Manifest validator v0.3: core + docker blocks + learning blocks (guided/remediation/evidence)."""
 import sys, pathlib, json
 try:
     import yaml
@@ -37,6 +37,22 @@ for f in found:
                 errors.append(f"{f}: i18n.{lang} file missing: {rel}")
     if "ctf" in data and "basePoints" not in data["ctf"]:
         errors.append(f"{f}: ctf.basePoints required when ctf present")
+    # v0.3 learning blocks — publishable labs need the full learning loop
+    if not data.get("hints"):
+        errors.append(f"{f}: hints required (staged, with level+cost)")
+    else:
+        for h in data["hints"]:
+            if "level" not in h or "cost" not in h or "text" not in h:
+                errors.append(f"{f}: every hint needs level+text+cost")
+    if not data.get("guidedSteps"):
+        errors.append(f"{f}: guidedSteps required (map/test/fix checkpoints)")
+    if not data.get("remediation") or "retest" not in (data.get("remediation") or {}):
+        errors.append(f"{f}: remediation.summary+retest required")
+    for o in data.get("objectives", []):
+        if "evidenceRequired" not in o:
+            errors.append(f"{f}: objective {o.get('id')}: evidenceRequired required")
+        if not isinstance((o.get("flag") or {}).get("objectiveId"), str):
+            errors.append(f"{f}: objective {o.get('id')}: server-side flag.objectiveId required")
 if errors:
     print("\n".join(errors)); sys.exit(1)
 print(f"manifests OK ({len(found)} labs)")

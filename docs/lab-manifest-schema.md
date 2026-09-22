@@ -1,8 +1,6 @@
-# Lab Manifest Schema (v0.2 — adds docker-feature blocks)
+# Lab Manifest Schema (v0.3 — adds learning blocks)
 
-All manifests: `labs/<track>/<slug>/lab.yaml`, semver immutable. Signed before publish (Phase 3). v0.2 adds optional `ctf`, `blueTeam`, `tutorPolicy`, `i18n` (see docs/ctf-competition-mode.md, blue-team-companion.md, ai-tutor-guardrails.md, tz-local-track.md).
-
-All manifests: `labs/<track>/<slug>/lab.yaml`, semver immutable. Signed before publish (Phase 3).
+All manifests: `labs/<track>/<slug>/lab.yaml`, semver immutable. Signed before publish (Phase 3). v0.2 added optional `ctf`, `blueTeam`, `tutorPolicy`, `i18n`. v0.3 requires the learning loop: staged `hints` (level+text+cost), `guidedSteps` (map/test/fix), `remediation` (summary+retest), per-objective `evidenceRequired` + server-side `flag.objectiveId`. Modes (guided/challenge/assessment/demo) are launch-time, see `docs/learning-modes.md`.
 
 ```yaml
 apiVersion: lab.kingaweb.io/v1
