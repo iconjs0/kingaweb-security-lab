@@ -1,0 +1,48 @@
+apiVersion: lab.kingaweb.io/v1
+kind: Lab
+metadata:
+  id: web-authz-01
+  slug: web-authz-01
+  version: 0.1.0
+  title: "Auth Boundaries: Function-Level Authorization"
+  summary: "Log in as a plain user, promote yourself via an unguarded function, then gate it."
+  difficulty: intermediate
+  timeMinutes: 45
+  author: "platform"
+  reviewer: "tbd"
+tracks: [web]
+owasp:
+  web: ["A01:2021-Broken Access Control"]
+  api: ["API5:2023-Broken Function Level Authorization"]
+cwe: [285, 639]
+prerequisites: [web-http-01, web-cookies-01]
+topology: "single container: users api (stdlib python)"
+targets:
+  - name: usersapi
+    image: "local/kingaweb-web-authz-01@sha256:LOCAL_BUILD"
+    ports: [8080]
+    healthcheck: { path: /healthz, port: 8080, timeoutSeconds: 5 }
+    resources: { cpu: "0.25", memory: "128Mi", pids: 32, diskMb: 128 }
+    readonlyFs: true
+network: { egress: deny, allowMocks: [] }
+session: { ttlMinutes: 60, maxExtendOnceMinutes: 15 }
+objectives:
+  - id: escalate-role
+    title: "Self-promote user→admin via /api/users/{id}/role, read /admin/flag"
+    flag: { validator: hmac, objectiveId: escalate-role }
+    evidenceRequired: true
+hints:
+  - { level: 1, text: "Login is user/user. Which function changes roles — and who may call it?...", cost: 5 }
+  - { level: 2, text: "POST your own promotion with your user token; then /admin/flag...", cost: 15 }
+guidedSteps:
+  - { checkpoint: map, title: "Roles", body: "Login user + admin; map /api/users/:id/role." }
+  - { checkpoint: test, title: "Escalate", body: "Promote yourself with a user token; capture the 200." }
+  - { checkpoint: fix, title: "Remediate", body: "Admin-only function check; user promotion → 403." }
+remediation: { summary: "Server-side function-level check on every sensitive action.", retest: "User self-promotion → 403; /admin/flag needs admin token." }
+blueTeam:
+  logBundle: "blue-team.json"
+  detectionGoal: "Alert on role changes performed by non-admin callers"
+  sampleQuerySplunk: 'index=lab uri="/api/users/*/role" caller_role=user status=200 | table user, target'
+tutorPolicy: { guidedMaxLevel: 2, challengeDiscloses: methodology-only, assessmentDiscloses: none }
+ctf: { basePoints: 400, floor: 100, firstBloodBonus: true }
+resetStrategy: recreate

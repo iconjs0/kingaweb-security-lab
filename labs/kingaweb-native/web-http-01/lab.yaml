@@ -1,0 +1,48 @@
+apiVersion: lab.kingaweb.io/v1
+kind: Lab
+metadata:
+  id: web-http-01
+  slug: web-http-01
+  version: 0.1.0
+  title: "HTTP in Depth: Methods, Override Headers, Status"
+  summary: "Learn request/response anatomy, then abuse X-HTTP-Method-Override to smuggle a state change."
+  difficulty: beginner
+  timeMinutes: 30
+  author: "platform"
+  reviewer: "tbd"
+tracks: [web]
+owasp:
+  web: ["A01:2021-Broken Access Control"]
+  api: []
+cwe: [650]
+prerequisites: []
+topology: "single container: notes app (stdlib python)"
+targets:
+  - name: notes
+    image: "local/kingaweb-web-http-01@sha256:LOCAL_BUILD"
+    ports: [8080]
+    healthcheck: { path: /healthz, port: 8080, timeoutSeconds: 5 }
+    resources: { cpu: "0.25", memory: "128Mi", pids: 32, diskMb: 128 }
+    readonlyFs: true
+network: { egress: deny, allowMocks: [] }
+session: { ttlMinutes: 45, maxExtendOnceMinutes: 15 }
+objectives:
+  - id: override-note
+    title: "Change the note via GET + X-HTTP-Method-Override, read /flag"
+    flag: { validator: hmac, objectiveId: override-note }
+    evidenceRequired: true
+hints:
+  - { level: 1, text: "GET is safe — unless the server honors an override header. Inspect request headers...", cost: 5 }
+  - { level: 2, text: "Send GET /note?text=... with X-HTTP-Method-Override: POST...", cost: 15 }
+guidedSteps:
+  - { checkpoint: map, title: "Anatomy", body: "GET /note, POST /note, status codes, content types." }
+  - { checkpoint: test, title: "Override", body: "Replay the GET with the override header; watch the note change." }
+  - { checkpoint: fix, title: "Remediate", body: "Ignore override on safe methods; retest (note stays hello)." }
+remediation: { summary: "Never honor method override on GET/HEAD; route by actual method.", retest: "GET+override leaves note unchanged; /flag → 403." }
+blueTeam:
+  logBundle: "blue-team.json"
+  detectionGoal: "Alert on state-changing GETs carrying override headers"
+  sampleQuerySplunk: 'index=lab method=GET override=* | stats count by uri'
+tutorPolicy: { guidedMaxLevel: 2, challengeDiscloses: methodology-only, assessmentDiscloses: none }
+ctf: { basePoints: 300, floor: 100, firstBloodBonus: true }
+resetStrategy: recreate

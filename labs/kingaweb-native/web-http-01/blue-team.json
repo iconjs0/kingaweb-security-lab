@@ -1,0 +1,1 @@
+{"bundle": "web-http-01 synthetic logs", "logs": [{"ts": "2026-09-22T10:00:01Z", "method": "GET", "uri": "/note", "status": 200}, {"ts": "2026-09-22T10:01:12Z", "method": "GET", "uri": "/note?text=HACKED", "override": "POST", "status": 200, "note": "SUSPICIOUS state change via safe method"}], "splunk": "index=lab method=GET override=* | stats count by uri"}

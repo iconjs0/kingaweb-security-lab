@@ -1,0 +1,1 @@
+{"bundle": "web-report-01 synthetic logs", "logs": [{"ts": "2026-09-22T10:00:01Z", "uri": "/findings", "status": 422, "note": "thin finding rejected"}, {"ts": "2026-09-22T10:02:00Z", "uri": "/findings", "status": 200, "note": "complete finding accepted"}], "splunk": "index=lab uri=\"/findings\" status=200 | stats count"}

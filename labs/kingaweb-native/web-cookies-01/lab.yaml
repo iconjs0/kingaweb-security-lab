@@ -1,0 +1,48 @@
+apiVersion: lab.kingaweb.io/v1
+kind: Lab
+metadata:
+  id: web-cookies-01
+  slug: web-cookies-01
+  version: 0.1.0
+  title: "Cookies & Sessions: Don't Trust the Jar"
+  summary: "Decode an unsigned session cookie, forge admin, then fix with HMAC-signed sessions."
+  difficulty: beginner
+  timeMinutes: 45
+  author: "platform"
+  reviewer: "tbd"
+tracks: [web]
+owasp:
+  web: ["A07:2021-Identification and Authentication Failures"]
+  api: []
+cwe: [565, 639]
+prerequisites: [web-http-01]
+topology: "single container: cookie app (stdlib python)"
+targets:
+  - name: cookieapp
+    image: "local/kingaweb-web-cookies-01@sha256:LOCAL_BUILD"
+    ports: [8080]
+    healthcheck: { path: /healthz, port: 8080, timeoutSeconds: 5 }
+    resources: { cpu: "0.25", memory: "128Mi", pids: 32, diskMb: 128 }
+    readonlyFs: true
+network: { egress: deny, allowMocks: [] }
+session: { ttlMinutes: 45, maxExtendOnceMinutes: 15 }
+objectives:
+  - id: become-admin
+    title: "Forge the session cookie to admin, read /admin flag"
+    flag: { validator: hmac, objectiveId: become-admin }
+    evidenceRequired: true
+hints:
+  - { level: 1, text: "The cookie decodes with base64. What identity does it assert?...", cost: 5 }
+  - { level: 2, text: "Re-encode {\"user\": \"admin\"} and replay /admin...", cost: 15 }
+guidedSteps:
+  - { checkpoint: map, title: "Read the jar", body: "/login sets session=; decode it; note missing signature." }
+  - { checkpoint: test, title: "Forge", body: "Mint an admin cookie client-side; GET /admin." }
+  - { checkpoint: fix, title: "Remediate", body: "HMAC-sign sessions; tampered cookies → 403." }
+remediation: { summary: "Sign session cookies (HMAC) and verify server-side; never trust client claims.", retest: "Forged cookie → 403; /admin needs signed admin session." }
+blueTeam:
+  logBundle: "blue-team.json"
+  detectionGoal: "Alert on role escalations without a matching login event"
+  sampleQuerySplunk: 'index=lab uri="/admin" status=200 | stats count by user'
+tutorPolicy: { guidedMaxLevel: 2, challengeDiscloses: methodology-only, assessmentDiscloses: none }
+ctf: { basePoints: 350, floor: 100, firstBloodBonus: true }
+resetStrategy: recreate

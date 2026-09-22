@@ -1,0 +1,48 @@
+apiVersion: lab.kingaweb.io/v1
+kind: Lab
+metadata:
+  id: web-report-01
+  slug: web-report-01
+  version: 0.1.0
+  title: "Evidence & Reporting: Write It Like a Pro"
+  summary: "Turn raw observations into a complete, gradeable finding with CWE and retest."
+  difficulty: beginner
+  timeMinutes: 30
+  author: "platform"
+  reviewer: "tbd"
+tracks: [web]
+owasp:
+  web: ["A09:2021-Security Logging and Monitoring Failures"]
+  api: []
+cwe: [778]
+prerequisites: [web-http-01]
+topology: "single container: evidence board (stdlib python)"
+targets:
+  - name: board
+    image: "local/kingaweb-web-report-01@sha256:LOCAL_BUILD"
+    ports: [8080]
+    healthcheck: { path: /healthz, port: 8080, timeoutSeconds: 5 }
+    resources: { cpu: "0.25", memory: "128Mi", pids: 32, diskMb: 128 }
+    readonlyFs: true
+network: { egress: deny, allowMocks: [] }
+session: { ttlMinutes: 30, maxExtendOnceMinutes: 15 }
+objectives:
+  - id: write-finding
+    title: "Submit a complete finding (all 6 fields, substantive) to /findings"
+    flag: { validator: hmac, objectiveId: write-finding }
+    evidenceRequired: false
+hints:
+  - { level: 1, text: "GET /template first — the board tells you exactly what it grades...", cost: 0 }
+  - { level: 2, text: "Each field needs >=12 real characters; 422 responses name gaps...", cost: 0 }
+guidedSteps:
+  - { checkpoint: map, title: "Template", body: "GET /template; study the six required fields." }
+  - { checkpoint: test, title: "Draft", body: "Write description/evidence/impact/CWE/remediation/retest." }
+  - { checkpoint: fix, title: "Submit", body: "POST /findings; iterate on 422 feedback until graded complete." }
+remediation: { summary: "Findings without retest steps are unactionable; always include them.", retest: "Resubmit a thin finding → 422 names the gap." }
+blueTeam:
+  logBundle: "blue-team.json"
+  detectionGoal: "Triage completeness: every accepted finding carries evidence + retest"
+  sampleQuerySplunk: 'index=lab uri="/findings" status=200 | stats count'
+tutorPolicy: { guidedMaxLevel: 2, challengeDiscloses: methodology-only, assessmentDiscloses: none }
+ctf: { basePoints: 200, floor: 100, firstBloodBonus: false }
+resetStrategy: recreate

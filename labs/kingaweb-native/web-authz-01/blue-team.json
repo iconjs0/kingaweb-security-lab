@@ -1,0 +1,1 @@
+{"bundle": "web-authz-01 synthetic logs", "logs": [{"ts": "2026-09-22T10:00:01Z", "caller": "user", "caller_role": "user", "uri": "/api/users/user/role", "status": 200, "note": "SUSPICIOUS self-promotion"}], "splunk": "index=lab uri=\"/api/users/*/role\" caller_role=user status=200 | table user, target"}

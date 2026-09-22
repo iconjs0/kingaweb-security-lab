@@ -1,0 +1,1 @@
+{"bundle": "web-cookies-01 synthetic logs", "logs": [{"ts": "2026-09-22T10:00:01Z", "user": "guest", "uri": "/login", "status": 200}, {"ts": "2026-09-22T10:01:12Z", "user": "admin", "uri": "/admin", "status": 200, "note": "SUSPICIOUS no admin login event"}], "splunk": "index=lab uri=\"/admin\" status=200 | stats count by user"}

@@ -1,0 +1,48 @@
+apiVersion: lab.kingaweb.io/v1
+kind: Lab
+metadata:
+  id: web-headers-01
+  slug: web-headers-01
+  version: 0.1.0
+  title: "TLS Headers, CORS & CSP: Read the Response"
+  summary: "Spot missing hardening headers and a wildcard CORS policy, then lock both down."
+  difficulty: beginner
+  timeMinutes: 30
+  author: "platform"
+  reviewer: "tbd"
+tracks: [web]
+owasp:
+  web: ["A05:2021-Security Misconfiguration"]
+  api: []
+cwe: [942, 693]
+prerequisites: [web-http-01]
+topology: "single container: data api (stdlib python)"
+targets:
+  - name: dataapi
+    image: "local/kingaweb-web-headers-01@sha256:LOCAL_BUILD"
+    ports: [8080]
+    healthcheck: { path: /healthz, port: 8080, timeoutSeconds: 5 }
+    resources: { cpu: "0.25", memory: "128Mi", pids: 32, diskMb: 128 }
+    readonlyFs: true
+network: { egress: deny, allowMocks: [] }
+session: { ttlMinutes: 45, maxExtendOnceMinutes: 15 }
+objectives:
+  - id: cors-steal
+    title: "Read cross-origin data with an evil Origin + creds, take /cors/flag"
+    flag: { validator: hmac, objectiveId: cors-steal }
+    evidenceRequired: true
+hints:
+  - { level: 1, text: "curl -i /api/data. Which headers are missing? What does ACAO say?...", cost: 5 }
+  - { level: 2, text: "Replay with Origin: https://evil.example + Cookie and watch it succeed...", cost: 15 }
+guidedSteps:
+  - { checkpoint: map, title: "Baseline", body: "Record response headers; list missing HSTS/CSP/frame options." }
+  - { checkpoint: test, title: "Cross-origin read", body: "Evil Origin + Cookie against /cors/flag." }
+  - { checkpoint: fix, title: "Remediate", body: "Origin allowlist + hardening headers; evil Origin → 403." }
+remediation: { summary: "Explicit Origin allowlist, Vary: Origin, HSTS/CSP/frame headers.", retest: "Evil Origin → 403; headers present on every response." }
+blueTeam:
+  logBundle: "blue-team.json"
+  detectionGoal: "Alert on credentialed cross-origin reads from unlisted origins"
+  sampleQuerySplunk: 'index=lab origin!=app.kingaweb.example status=200 | stats count by origin'
+tutorPolicy: { guidedMaxLevel: 2, challengeDiscloses: methodology-only, assessmentDiscloses: none }
+ctf: { basePoints: 300, floor: 100, firstBloodBonus: true }
+resetStrategy: recreate
