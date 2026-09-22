@@ -1,0 +1,8 @@
+{
+  "openapi": "3.1.0",
+  "info": { "title": "KingaWeb Security Lab API", "version": "0.1.0" },
+  "paths": {
+    "/v1/labs": { "get": { "summary": "List labs (Phase 2)" } },
+    "/v1/sessions": { "post": { "summary": "Launch session (Phase 2)" } }
+  }
+}

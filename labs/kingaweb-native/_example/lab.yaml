@@ -1,0 +1,37 @@
+apiVersion: lab.kingaweb.io/v1
+kind: Lab
+metadata:
+  id: web-idor-01
+  slug: web-idor-01
+  version: 0.1.0
+  title: "Broken Access Control: IDOR (example)"
+  summary: "Placeholder manifest used only to validate schema in CI."
+  difficulty: beginner
+  timeMinutes: 45
+  author: "platform"
+  reviewer: "tbd"
+tracks: [web]
+owasp:
+  web: ["A01:2021-Broken Access Control"]
+  api: []
+cwe: [639]
+prerequisites: [http-foundations]
+topology: "single container placeholder"
+targets:
+  - name: shop
+    image: "ghcr.io/kingaweb/lab-idor@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    ports: [8080]
+    healthcheck: { path: /healthz, port: 8080, timeoutSeconds: 5 }
+    resources: { cpu: "0.5", memory: "256Mi", pids: 64, diskMb: 512 }
+    readonlyFs: true
+network: { egress: deny, allowMocks: [] }
+session: { ttlMinutes: 60, maxExtendOnceMinutes: 30 }
+objectives:
+  - id: read-other-order
+    title: "Read another user's order"
+    flag: { validator: hmac, objectiveId: read-other-order }
+    evidenceRequired: true
+hints:
+  - { level: 1, text: "Compare order URLs...", cost: 5 }
+remediation: { summary: "Server-side authz check.", retest: "Expect 403." }
+resetStrategy: recreate
