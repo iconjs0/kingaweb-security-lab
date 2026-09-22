@@ -2,6 +2,40 @@
 import { useState } from "react";
 import { Badge, CommandBlock, FindingCard, ObjectiveList, Panel } from "@kingaweb/design-system";
 
+const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const DEV_TOKEN = process.env.NEXT_PUBLIC_DEV_TOKEN ?? "dev-learner";
+
+function HintUnlocker() {
+  const [sid, setSid] = useState("");
+  const [out, setOut] = useState<string | null>(null);
+  async function unlock() {
+    setOut("Unlocking…");
+    try {
+      const r = await fetch(`${API}/v1/sessions/${sid}/hints/unlock`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${DEV_TOKEN}` },
+      });
+      const j = await r.json();
+      setOut(r.ok ? `Level ${j.level} (−${j.cost} pts): ${j.text}` : `Locked (${r.status}): ${j.detail ?? "no further hints"}`);
+    } catch {
+      setOut("API unreachable — start the compose stack for live hints.");
+    }
+  }
+  return (
+    <div className="stack">
+      <div className="toolbar">
+        <label className="mono" style={{ fontSize: "var(--fs-small)" }} htmlFor="hint-sid">Session</label>
+        <input id="hint-sid" className="input mono" value={sid} onChange={(e) => setSid(e.target.value)} placeholder="s-…" style={{ maxWidth: 160 }} />
+        <button className="btn btn-sm" type="button" onClick={unlock}>Unlock next hint</button>
+      </div>
+      {out && <p role="status" style={{ fontSize: "var(--fs-small)", margin: 0 }}>{out}</p>}
+      <p style={{ fontSize: "var(--fs-small)", color: "var(--text-2)", margin: 0 }}>
+        Sequential unlocks; costs deduct from score. Assessment caps at 1.
+      </p>
+    </div>
+  );
+}
+
 export default function Workspace() {
   const [method, setMethod] = useState("GET");
   const [path, setPath] = useState("/orders/102");
@@ -28,8 +62,8 @@ export default function Workspace() {
           <Panel title="Topology">
             <p className="mono" style={{ fontSize: "var(--fs-small)" }}>browser → api → session-net → shop:8080 (read-only fs, no egress)</p>
           </Panel>
-          <Panel title="Hints">
-            <p style={{ fontSize: "var(--fs-small)", color: "var(--text-2)" }}>Level 1 unlocked (−5 pts): compare your order URL with another…</p>
+          <Panel title="Hints (live)">
+            <HintUnlocker />
           </Panel>
         </div>
         <div className="stack">
