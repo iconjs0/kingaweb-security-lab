@@ -1,6 +1,7 @@
-"""Per-session HMAC flags (mirrors docs/anti-cheat-flags.md).
-flag = KW{hex(HMAC_SHA256(key=SECRET:seed, msg=session:version:objective))[:16]}
-Server-side only. Constant-time compare. Only hashes stored on failure/success."""
+"""Per-session seed-bound flags — mirrors packages/lab-sdk/flag.py (parity tested).
+flag = KW{hex(HMAC_SHA256(key='kw-v1:'+seed, msg=session:objective))[:16]}
+Targets mint via SESSION_SEED/SESSION_ID env (injected by orchestrator, never
+baked into images); API verifies from the stored seed. Only hashes stored."""
 import hashlib
 import hmac
 import os
@@ -9,6 +10,7 @@ import secrets
 PREFIX = "KW{"
 
 def hmac_secret() -> str:
+    # retained for session provisioning entropy checks; flags are seed-bound (see above)
     s = os.environ.get("FLAG_HMAC_SECRET", "")
     if len(s) < 16:
         raise RuntimeError("FLAG_HMAC_SECRET missing or too short (>=16 chars)")
@@ -18,8 +20,8 @@ def new_seed_hex(nbytes: int = 16) -> str:
     return secrets.token_hex(nbytes)
 
 def mint_flag(session_id: str, lab_version: str, objective_id: str, seed_hex: str) -> str:
-    key = f"{hmac_secret()}:{seed_hex}".encode()
-    msg = f"{session_id}:{lab_version}:{objective_id}".encode()
+    key = ("kw-v1:" + seed_hex).encode()
+    msg = f"{session_id}:{objective_id}".encode()
     return PREFIX + hmac.new(key, msg, hashlib.sha256).hexdigest()[:16] + "}"
 
 def verify_flag(candidate: str, session_id: str, lab_version: str, objective_id: str, seed_hex: str) -> bool:

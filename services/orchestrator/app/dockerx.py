@@ -27,7 +27,8 @@ def client():
 def create_network(cli, sid: str):
     return cli.networks.create(f"kw-{sid}", internal=True, labels={LABEL: sid})
 
-def run_target(cli, sid: str, net, target: dict, resources: dict | None = None):
+def run_target(cli, sid: str, net, target: dict, resources: dict | None = None,
+               env: dict[str, str] | None = None):
     # NOTE: no published ports — session nets are internal (Docker gives null
     # bindings there). Access flows via loopback relays (relay.py) instead.
     res = resources or {}
@@ -45,6 +46,7 @@ def run_target(cli, sid: str, net, target: dict, resources: dict | None = None):
         pids_limit=res.get("pids", 64),
         cap_drop=["ALL"],
         security_opt=["no-new-privileges"],
+        environment=env or {},
     )
     return container
 

@@ -58,6 +58,8 @@ class ProvisionIn(BaseModel):
     lab_slug: str
     lab_version: str
     ttl_minutes: int = 60
+    seed_hex: str = ""
+    image_mode: str = "vuln"  # vuln | fixed (fixed used by regression tests)
 
 @app.get("/healthz")
 def healthz():
@@ -93,9 +95,11 @@ def provision(body: ProvisionIn, _=Depends(authed)):
     net = dockerx.create_network(cli, body.session_id)
     exposed = []
     relays = []
+    tenv = {"SESSION_ID": body.session_id, "SESSION_SEED": body.seed_hex,
+            "LAB_MODE": body.image_mode if body.image_mode in ("vuln", "fixed") else "vuln"}
     try:
         for t in targets:
-            c = dockerx.run_target(cli, body.session_id, net, t, t.get("resources"))
+            c = dockerx.run_target(cli, body.session_id, net, t, t.get("resources"), env=tenv)
             ip = None
             for _ in range(30):
                 ip = dockerx.container_ip(c, net.name)
@@ -139,14 +143,14 @@ def extend(sid: str, minutes: int = 30, _=Depends(authed)):
     return {"session_id": sid, "expires_at": exp}
 
 @app.post("/v1/orch/sessions/{sid}/reset")
-def reset(sid: str, lab_slug: str, lab_version: str, ttl_minutes: int = 60, _=Depends(authed)):
+def reset(sid: str, lab_slug: str, lab_version: str, ttl_minutes: int = 60, seed_hex: str = "", _=Depends(authed)):
     try:
         cli = dockerx.client()
         dockerx.destroy_session(cli, sid)
     except Exception as e:
         raise HTTPException(503, f"docker unavailable: {e}")
     store.drop(sid, "reset")
-    return provision(ProvisionIn(session_id=sid, lab_slug=lab_slug, lab_version=lab_version, ttl_minutes=ttl_minutes), True)
+    return provision(ProvisionIn(session_id=sid, lab_slug=lab_slug, lab_version=lab_version, ttl_minutes=ttl_minutes, seed_hex=seed_hex), True)
 
 @app.delete("/v1/orch/sessions/{sid}")
 def destroy(sid: str, _=Depends(authed)):

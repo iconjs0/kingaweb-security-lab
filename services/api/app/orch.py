@@ -24,15 +24,16 @@ def _call(method: str, path: str, body: dict | None = None, timeout: int = 40) -
     except Exception as e:
         raise ConnectionError(str(e))
 
-def provision(sid: str, slug: str, version: str, ttl: int) -> tuple[int, dict]:
+def provision(sid: str, slug: str, version: str, ttl: int, seed_hex: str = "") -> tuple[int, dict]:
     return _call("POST", "/v1/orch/sessions",
-                 {"session_id": sid, "lab_slug": slug, "lab_version": version, "ttl_minutes": ttl}, timeout=90)
+                 {"session_id": sid, "lab_slug": slug, "lab_version": version,
+                  "ttl_minutes": ttl, "seed_hex": seed_hex}, timeout=90)
 
 def extend(sid: str, minutes: int) -> tuple[int, dict]:
     return _call("POST", f"/v1/orch/sessions/{sid}/extend?minutes={minutes}", {})
 
-def reset(sid: str, slug: str, version: str, ttl: int) -> tuple[int, dict]:
-    return _call("POST", f"/v1/orch/sessions/{sid}/reset?lab_slug={slug}&lab_version={version}&ttl_minutes={ttl}", {})
+def reset(sid: str, slug: str, version: str, ttl: int, seed_hex: str = "") -> tuple[int, dict]:
+    return _call("POST", f"/v1/orch/sessions/{sid}/reset?lab_slug={slug}&lab_version={version}&ttl_minutes={ttl}&seed_hex={seed_hex}", {})
 
 def destroy(sid: str) -> tuple[int, dict]:
     return _call("DELETE", f"/v1/orch/sessions/{sid}", None)

@@ -105,7 +105,7 @@ def launch(body: LaunchIn, db: DBSession = Depends(get_db), user: User = Depends
     provisioned = False
     if orch_client.base():
         try:
-            code, resp = orch_client.provision(sid, lab.slug, lab.version, ttl)
+            code, resp = orch_client.provision(sid, lab.slug, lab.version, ttl, s.seed_hex)
             if code in (200, 201):
                 targets = resp.get("targets", targets)
                 s.targets_json = json.dumps(targets)
@@ -165,7 +165,7 @@ def reset(sid: str, db: DBSession = Depends(get_db), user: User = Depends(curren
     if orch_client.base():
         try:
             lab = lab_or_404(db, s.lab_slug, s.lab_version)
-            code, resp = orch_client.reset(sid, s.lab_slug, s.lab_version, lab.ttl_minutes)
+            code, resp = orch_client.reset(sid, s.lab_slug, s.lab_version, lab.ttl_minutes, s.seed_hex)
             if code in (200, 201):
                 s.targets_json = json.dumps(resp.get("targets", []))
             else:
