@@ -1,0 +1,12 @@
+{
+  "bundle": "web-idor-01 synthetic logs (UTC, no PII)",
+  "detectionGoal": "Find IDOR reads: 200 on /orders/:id for non-owner",
+  "logs": [
+    {"ts": "2026-09-22T10:00:01Z", "user": "amina", "method": "GET", "uri": "/orders/101", "status": 200, "note": "owner ok"},
+    {"ts": "2026-09-22T10:01:12Z", "user": "amina", "method": "GET", "uri": "/orders/102", "status": 200, "note": "SUSPICIOUS: not owner"},
+    {"ts": "2026-09-22T10:01:13Z", "user": "amina", "method": "GET", "uri": "/orders/103", "status": 200, "note": "SUSPICIOUS: enumeration"},
+    {"ts": "2026-09-22T10:02:00Z", "user": "amina", "method": "GET", "uri": "/orders/104", "status": 403, "note": "post-fix: denied"}
+  ],
+  "splunk": "index=lab sourcetype=shop_access user!=owner uri=\"/orders/*\" status=200 | stats count by user, uri",
+  "elastic": "user.keyword:* AND NOT user:owner AND url.path:/orders/* AND http.response.status_code:200"
+}

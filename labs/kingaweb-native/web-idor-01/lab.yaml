@@ -1,0 +1,48 @@
+apiVersion: lab.kingaweb.io/v1
+kind: Lab
+metadata:
+  id: web-idor-01
+  slug: web-idor-01
+  version: 0.1.0
+  title: "Broken Access Control: IDOR"
+  summary: "Log in as amina, read juma's order, then enforce ownership server-side."
+  difficulty: beginner
+  timeMinutes: 45
+  author: "platform"
+  reviewer: "tbd"
+tracks: [web]
+owasp:
+  web: ["A01:2021-Broken Access Control"]
+  api: []
+cwe: [639]
+prerequisites: [web-http-01]
+topology: "single container: orders shop (stdlib python)"
+targets:
+  - name: shop
+    image: "local/kingaweb-web-idor-01@sha256:LOCAL_BUILD"
+    ports: [8080]
+    healthcheck: { path: /healthz, port: 8080, timeoutSeconds: 5 }
+    resources: { cpu: "0.25", memory: "128Mi", pids: 32, diskMb: 128 }
+    readonlyFs: true
+network: { egress: deny, allowMocks: [] }
+session: { ttlMinutes: 60, maxExtendOnceMinutes: 15 }
+objectives:
+  - id: read-other-order
+    title: "Read juma's order as amina (login amina/shopper)"
+    flag: { validator: hmac, objectiveId: read-other-order }
+    evidenceRequired: true
+hints:
+  - { level: 1, text: "Login tells you your own order IDs. What happens with the other one?...", cost: 5 }
+  - { level: 2, text: "GET /orders/102 with amina's token; compare with /orders/101...", cost: 15 }
+guidedSteps:
+  - { checkpoint: map, title: "Map order endpoints", body: "POST /login as amina/shopper; list your order IDs." }
+  - { checkpoint: test, title: "Test authorization", body: "Replay the foreign ID; record 200 vs 403 as evidence." }
+  - { checkpoint: fix, title: "Remediate", body: "Enforce server-side ownership check; retest for 403." }
+remediation: { summary: "Server-side ownership check on every object read.", retest: "Foreign order → 403." }
+blueTeam:
+  logBundle: "blue-team.json"
+  detectionGoal: "Find IDOR reads: 200 on /orders/:id for non-owner"
+  sampleQuerySplunk: 'index=lab sourcetype=shop_access user!=owner uri="/orders/*" status=200 | stats count by user, uri'
+tutorPolicy: { guidedMaxLevel: 2, challengeDiscloses: methodology-only, assessmentDiscloses: none }
+ctf: { basePoints: 350, floor: 100, firstBloodBonus: true }
+resetStrategy: recreate

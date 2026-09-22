@@ -1,0 +1,48 @@
+apiVersion: lab.kingaweb.io/v1
+kind: Lab
+metadata:
+  id: web-xss-01
+  slug: web-xss-01
+  version: 0.1.0
+  title: "XSS: Stored Payload, Proved"
+  summary: "Persist a script marker unescaped, prove reflection, then escape + CSP."
+  difficulty: intermediate
+  timeMinutes: 45
+  author: "platform"
+  reviewer: "tbd"
+tracks: [web]
+owasp:
+  web: ["A03:2021-Injection"]
+  api: []
+cwe: [79]
+prerequisites: [web-http-01]
+topology: "single container: guestbook (stdlib python)"
+targets:
+  - name: guestbook
+    image: "local/kingaweb-web-xss-01@sha256:LOCAL_BUILD"
+    ports: [8080]
+    healthcheck: { path: /healthz, port: 8080, timeoutSeconds: 5 }
+    resources: { cpu: "0.25", memory: "128Mi", pids: 32, diskMb: 128 }
+    readonlyFs: true
+network: { egress: deny, allowMocks: [] }
+session: { ttlMinutes: 45, maxExtendOnceMinutes: 15 }
+objectives:
+  - id: stored-xss
+    title: "Store <script>MARKER</script> and claim /flag?marker=MARKER"
+    flag: { validator: hmac, objectiveId: stored-xss }
+    evidenceRequired: true
+hints:
+  - { level: 1, text: "POST a comment, GET /comments. Is your HTML escaped?...", cost: 5 }
+  - { level: 2, text: "Store <script>YOURMARKER</script>, then /flag?marker=YOURMARKER...", cost: 15 }
+guidedSteps:
+  - { checkpoint: map, title: "Render", body: "Post plain text; observe raw reflection in HTML." }
+  - { checkpoint: test, title: "Inject", body: "Store a script marker; claim the flag with it." }
+  - { checkpoint: fix, title: "Remediate", body: "Output-encode + CSP; marker stays inert, /flag → 403." }
+remediation: { summary: "Context-aware output encoding + Content-Security-Policy.", retest: "Payload renders as text; CSP header present." }
+blueTeam:
+  logBundle: "blue-team.json"
+  detectionGoal: "Alert on script tags persisted in user content"
+  sampleQuerySplunk: 'index=lab uri="/comments" ("<script" OR "onerror=") | stats count by src'
+tutorPolicy: { guidedMaxLevel: 2, challengeDiscloses: methodology-only, assessmentDiscloses: none }
+ctf: { basePoints: 400, floor: 100, firstBloodBonus: true }
+resetStrategy: recreate

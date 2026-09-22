@@ -1,0 +1,1 @@
+{"bundle": "web-sqli-01 synthetic logs", "logs": [{"ts": "2026-09-22T10:00:01Z", "uri": "/login", "username": "guest", "status": 200}, {"ts": "2026-09-22T10:01:12Z", "uri": "/login", "username": "admin' --", "status": 200, "note": "SUSPICIOUS injection"}], "splunk": "index=lab uri=\"/login\" (\"' OR\" OR \"--\" OR \"UNION\") | stats count by username"}

@@ -1,0 +1,48 @@
+apiVersion: lab.kingaweb.io/v1
+kind: Lab
+metadata:
+  id: web-sqli-01
+  slug: web-sqli-01
+  version: 0.1.0
+  title: "Injection: SQL Login Bypass"
+  summary: "Break a string-concatenated login with classic injection, then parameterize it."
+  difficulty: intermediate
+  timeMinutes: 45
+  author: "platform"
+  reviewer: "tbd"
+tracks: [web]
+owasp:
+  web: ["A03:2021-Injection"]
+  api: []
+cwe: [89]
+prerequisites: [web-http-01]
+topology: "single container: sqlite login (stdlib python)"
+targets:
+  - name: loginapp
+    image: "local/kingaweb-web-sqli-01@sha256:LOCAL_BUILD"
+    ports: [8080]
+    healthcheck: { path: /healthz, port: 8080, timeoutSeconds: 5 }
+    resources: { cpu: "0.25", memory: "128Mi", pids: 32, diskMb: 128 }
+    readonlyFs: true
+network: { egress: deny, allowMocks: [] }
+session: { ttlMinutes: 60, maxExtendOnceMinutes: 15 }
+objectives:
+  - id: sqli-login
+    title: "Log in as admin without the password, take the flag"
+    flag: { validator: hmac, objectiveId: sqli-login }
+    evidenceRequired: true
+hints:
+  - { level: 1, text: "The query is built with string glue. Which quote breaks out?...", cost: 5 }
+  - { level: 2, text: "Try admin' --  or ' OR '1'='1 as username...", cost: 15 }
+guidedSteps:
+  - { checkpoint: map, title: "Probe", body: "POST /login with quotes; note 500 vs 401 differences." }
+  - { checkpoint: test, title: "Bypass", body: "Comment out the password check; capture the admin flag." }
+  - { checkpoint: fix, title: "Remediate", body: "Parameterized query; payload now fails with 401." }
+remediation: { summary: "Parameterized queries (never string interpolation) + least-privilege DB user.", retest: "Injection payloads → 401; admin login still works with real password." }
+blueTeam:
+  logBundle: "blue-team.json"
+  detectionGoal: "Alert on SQL syntax fragments in login fields"
+  sampleQuerySplunk: 'index=lab uri="/login" ("'' OR" OR "--" OR "UNION") | stats count by username'
+tutorPolicy: { guidedMaxLevel: 2, challengeDiscloses: methodology-only, assessmentDiscloses: none }
+ctf: { basePoints: 450, floor: 100, firstBloodBonus: true }
+resetStrategy: recreate

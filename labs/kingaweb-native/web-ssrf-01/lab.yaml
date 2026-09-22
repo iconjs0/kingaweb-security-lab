@@ -1,0 +1,54 @@
+apiVersion: lab.kingaweb.io/v1
+kind: Lab
+metadata:
+  id: web-ssrf-01
+  slug: web-ssrf-01
+  version: 0.1.0
+  title: "SSRF: Fetch the Internal Secret"
+  summary: "Abuse an open URL fetcher to reach in-session mock metadata, then allowlist it."
+  difficulty: intermediate
+  timeMinutes: 45
+  author: "platform"
+  reviewer: "tbd"
+tracks: [web]
+owasp:
+  web: ["A10:2021-Server-Side Request Forgery"]
+  api: []
+cwe: [918]
+prerequisites: [web-http-01]
+topology: "two containers in one session net: fetcher + mock-metadata (stdlib python)"
+targets:
+  - name: fetcher
+    image: "local/kingaweb-web-ssrf-01@sha256:LOCAL_BUILD"
+    ports: [8080]
+    healthcheck: { path: /healthz, port: 8080, timeoutSeconds: 5 }
+    resources: { cpu: "0.25", memory: "128Mi", pids: 32, diskMb: 128 }
+    readonlyFs: true
+  - name: mock-metadata
+    image: "local/internal-meta@sha256:LOCAL_BUILD"
+    ports: [8081]
+    healthcheck: { path: /healthz, port: 8081, timeoutSeconds: 5 }
+    resources: { cpu: "0.25", memory: "128Mi", pids: 32, diskMb: 128 }
+    readonlyFs: true
+network: { egress: deny, allowMocks: [mock-metadata] }
+session: { ttlMinutes: 60, maxExtendOnceMinutes: 15 }
+objectives:
+  - id: fetch-secret
+    title: "Fetch http://mock-metadata:8081/secret through /fetch, take the flag"
+    flag: { validator: hmac, objectiveId: fetch-secret }
+    evidenceRequired: true
+hints:
+  - { level: 1, text: "/fetch?url= trusts you fully. What internal hostnames resolve here?...", cost: 5 }
+  - { level: 2, text: "Fetch http://mock-metadata:8081/secret through the fetcher...", cost: 15 }
+guidedSteps:
+  - { checkpoint: map, title: "Fetcher", body: "Fetch a benign URL; note missing host validation." }
+  - { checkpoint: test, title: "Pivot", body: "Reach mock-metadata over the session net; capture the flag." }
+  - { checkpoint: fix, title: "Remediate", body: "Host allowlist + scheme check; metadata fetch → 403." }
+remediation: { summary: "Allowlisted fetch hosts, no redirects to internal ranges, metadata protection.", retest: "Internal host → 403; public fetch still works." }
+blueTeam:
+  logBundle: "blue-team.json"
+  detectionGoal: "Alert on fetcher calls to internal hostnames"
+  sampleQuerySplunk: 'index=lab uri="/fetch" (metadata OR "169.254" OR localhost) | stats count by url'
+tutorPolicy: { guidedMaxLevel: 2, challengeDiscloses: methodology-only, assessmentDiscloses: none }
+ctf: { basePoints: 450, floor: 100, firstBloodBonus: true }
+resetStrategy: recreate
