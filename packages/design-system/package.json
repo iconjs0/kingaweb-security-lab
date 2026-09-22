@@ -1,1 +1,1 @@
-{"name":"design-system","version":"0.1.0"}
+{"name":"@kingaweb/design-system","version":"0.1.0","type":"module","exports":{".":"./index.ts","./tokens.css":"./tokens.css"}}
