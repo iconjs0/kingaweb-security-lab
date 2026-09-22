@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session as DBSession
 
 from .auth import current_user, login_dev, require_roles
 from .db import get_db
+from . import orch as orch_client
 from .flags import flag_hash, mint_flag, new_seed_hex, score_solve, verify_flag
 from .models import Audit, Competition, Enrollment, Lab, Membership, Session, Submission, Team, User
 
@@ -86,19 +87,45 @@ def launch(body: LaunchIn, db: DBSession = Depends(get_db), user: User = Depends
     now = datetime.now(timezone.utc)
     s = Session(id=sid, owner_id=user.id, lab_slug=lab.slug, lab_version=lab.version,
                 seed_hex=new_seed_hex(), status="active", competition_id=body.competition_id,
-                idempotency_key=idempotency_key,
+                idempotency_key=idempotency_key, targets_json="[]",
                 expires_at=now + timedelta(minutes=lab.ttl_minutes))
     db.add(s)
-    audit(db, user.id, "session.launch", sid)
     db.commit()
+    targets: list[dict] = _targets_for(lab)
+    provisioned = False
+    if orch_client.base():
+        try:
+            code, resp = orch_client.provision(sid, lab.slug, lab.version, lab.ttl_minutes)
+            if code in (200, 201):
+                targets = resp.get("targets", targets)
+                s.targets_json = json.dumps(targets)
+                provisioned = True
+                audit(db, user.id, "session.provisioned", sid)
+            else:
+                # policy rejection is authoritative: refuse launch, don't hand out a dead session
+                db.delete(s)
+                db.commit()
+                raise HTTPException(code, f"orchestrator refused: {resp.get('detail', resp)}")
+        except HTTPException:
+            raise
+        except ConnectionError as e:
+            audit(db, user.id, "orch.unavailable", f"{sid}:{e}")
+        db.commit()
+    else:
+        audit(db, user.id, "session.launch", sid)
+        db.commit()
     return {"id": sid, "lab": f"{lab.slug}@{lab.version}", "status": "active",
-            "expires_at": s.expires_at.isoformat(), "targets": _targets_for(lab)}
+            "expires_at": s.expires_at.isoformat(), "targets": targets, "provisioned": provisioned}
 
 @router.get("/v1/sessions/{sid}")
 def get_session(sid: str, db: DBSession = Depends(get_db), user: User = Depends(current_user)):
     s = own_session(db, sid, user)
+    try:
+        targets = json.loads(s.targets_json or "[]") or _targets_for(lab_or_404(db, s.lab_slug, s.lab_version))
+    except Exception:
+        targets = []
     return {"id": s.id, "lab": f"{s.lab_slug}@{s.lab_version}", "status": s.status,
-            "expires_at": s.expires_at.isoformat() if s.expires_at else None}
+            "expires_at": s.expires_at.isoformat() if s.expires_at else None, "targets": targets}
 
 @router.post("/v1/sessions/{sid}/extend")
 def extend(sid: str, db: DBSession = Depends(get_db), user: User = Depends(current_user)):
@@ -108,6 +135,11 @@ def extend(sid: str, db: DBSession = Depends(get_db), user: User = Depends(curre
     minutes = 30
     exp = s.expires_at if getattr(s.expires_at, "tzinfo", None) else s.expires_at.replace(tzinfo=timezone.utc)
     s.expires_at = exp + timedelta(minutes=minutes)
+    if orch_client.base():
+        try:
+            orch_client.extend(sid, minutes)
+        except Exception as e:
+            audit(db, user.id, "orch.extend-failed", f"{sid}:{e}")
     audit(db, user.id, "session.extend", sid)
     db.commit()
     return {"id": sid, "expires_at": s.expires_at.isoformat()}
@@ -117,6 +149,18 @@ def reset(sid: str, db: DBSession = Depends(get_db), user: User = Depends(curren
     s = own_session(db, sid, user)
     s.seed_hex = new_seed_hex()  # flags rotate; destroy+recreate semantics
     s.status = "active"
+    if orch_client.base():
+        try:
+            lab = lab_or_404(db, s.lab_slug, s.lab_version)
+            code, resp = orch_client.reset(sid, s.lab_slug, s.lab_version, lab.ttl_minutes)
+            if code in (200, 201):
+                s.targets_json = json.dumps(resp.get("targets", []))
+            else:
+                raise HTTPException(code, f"orchestrator reset refused: {resp.get('detail', resp)}")
+        except HTTPException:
+            raise
+        except Exception as e:
+            audit(db, user.id, "orch.reset-failed", f"{sid}:{e}")
     audit(db, user.id, "session.reset", sid)
     db.commit()
     return {"id": sid, "status": "active", "rotated": True}
@@ -124,6 +168,11 @@ def reset(sid: str, db: DBSession = Depends(get_db), user: User = Depends(curren
 @router.delete("/v1/sessions/{sid}")
 def destroy(sid: str, db: DBSession = Depends(get_db), user: User = Depends(current_user)):
     s = own_session(db, sid, user)
+    if orch_client.base():
+        try:
+            orch_client.destroy(sid)
+        except Exception as e:
+            audit(db, user.id, "orch.destroy-failed", f"{sid}:{e}")
     s.status = "destroyed"
     audit(db, user.id, "session.destroy", sid)
     db.commit()
@@ -184,9 +233,30 @@ def proxy(sid: str, body: ProxyIn, db: DBSession = Depends(get_db), user: User =
         raise HTTPException(400, "path must start with /")
     lab = lab_or_404(db, s.lab_slug, s.lab_version)
     allowed = {t["allow_host"] for t in json.loads(lab.targets_json)} & set(ALLOWED_HOSTS)
-    if body.host not in allowed:
-        raise HTTPException(403, f"host not in session allowlist: {sorted(allowed)}")
-    url = ALLOWED_HOSTS[body.host] + body.path
+    try:
+        orch_targets = json.loads(s.targets_json or "[]")
+    except Exception:
+        orch_targets = []
+    # orchestrator-provisioned loopback relays: exact host+port match only
+    relay_ports = {(t.get("host"), int(t.get("port"))) for t in orch_targets
+                   if t.get("host") in ("127.0.0.1", "localhost") and t.get("port")}
+    url: str
+    if body.host in ("127.0.0.1", "localhost"):
+        match = [p for _, p in relay_ports]
+        if not match:
+            raise HTTPException(403, "no relay provisioned for this session")
+        # single-target labs need no header; multi-target uses X-Relay-Port
+        port = int((body.headers or {}).get("X-Relay-Port", match[0]))
+        if port not in match:
+            raise HTTPException(403, "relay port not in session allowlist")
+        # relays bind host loopback; the API container reaches them via the host gateway
+        rh = os.environ.get("RELAY_HOST", "127.0.0.1")
+        url = f"http://{rh}:{port}" + body.path
+        body.headers = {k: v for k, v in body.headers.items() if k.lower() != "x-relay-port"}
+    else:
+        if body.host not in allowed:
+            raise HTTPException(403, f"host not in session allowlist: {sorted(allowed)}")
+        url = ALLOWED_HOSTS[body.host] + body.path
     data = (body.body or "").encode()[:262144]
     req = urllib.request.Request(url, data=data or None, method=body.method,
                                  headers={k: v[:512] for k, v in list(body.headers.items())[:20]})

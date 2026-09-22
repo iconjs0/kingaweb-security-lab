@@ -11,6 +11,17 @@ from .seed import seed_labs
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    # lightweight column migrate (Alembic lands Phase 10)
+    try:
+        with engine.begin() as conn:
+            cols = [r[1] for r in conn.exec_driver_sql("PRAGMA table_info(sessions)").fetchall()] \
+                if engine.dialect.name == "sqlite" else []
+            if engine.dialect.name == "sqlite" and "targets_json" not in cols:
+                conn.exec_driver_sql("ALTER TABLE sessions ADD COLUMN targets_json TEXT DEFAULT '[]'")
+            if engine.dialect.name != "sqlite":
+                conn.exec_driver_sql("ALTER TABLE sessions ADD COLUMN IF NOT EXISTS targets_json TEXT DEFAULT '[]'")
+    except Exception:
+        pass
     db = SessionLocal()
     try:
         seed_labs(db, find_labs_root())

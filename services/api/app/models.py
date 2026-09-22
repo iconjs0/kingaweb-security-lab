@@ -45,6 +45,7 @@ class Session(Base):
     status: Mapped[str] = mapped_column(String(32), default="active")
     competition_id: Mapped[str] = mapped_column(String(64), nullable=True)
     idempotency_key: Mapped[str] = mapped_column(String(128), nullable=True)
+    targets_json: Mapped[str] = mapped_column(Text, default="[]")  # orchestrator connection details
     expires_at: Mapped[str] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
