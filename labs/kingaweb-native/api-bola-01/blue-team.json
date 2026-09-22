@@ -1,0 +1,1 @@
+{"bundle": "api-bola-01 synthetic logs", "logs": [{"ts": "2026-09-22T10:00:01Z", "caller": "alice", "uri": "/api/v1/invoices/INV-1", "status": 200}, {"ts": "2026-09-22T10:01:12Z", "caller": "alice", "uri": "/api/v1/invoices/INV-2", "status": 200, "note": "SUSPICIOUS cross-owner"}], "splunk": "index=lab uri=\"/api/v1/invoices/*\" owner!=caller status=200 | stats count by caller"}

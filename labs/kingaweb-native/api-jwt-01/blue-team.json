@@ -1,0 +1,1 @@
+{"bundle": "api-jwt-01 synthetic logs", "logs": [{"ts": "2026-09-22T10:00:01Z", "uri": "/admin/flag", "alg": "HS256", "status": 403}, {"ts": "2026-09-22T10:01:12Z", "uri": "/admin/flag", "alg": "none", "status": 200, "note": "SUSPICIOUS unsigned token accepted"}], "splunk": "index=lab uri=\"/admin/*\" jwt_alg!=HS256 | stats count by alg"}

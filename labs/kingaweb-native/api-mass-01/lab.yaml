@@ -1,0 +1,48 @@
+apiVersion: lab.kingaweb.io/v1
+kind: Lab
+metadata:
+  id: api-mass-01
+  slug: api-mass-01
+  version: 0.1.0
+  title: "API Mass Assignment: Promote Yourself via PATCH"
+  summary: "Sneak role=admin through a profile update, then allowlist bindable fields."
+  difficulty: intermediate
+  timeMinutes: 30
+  author: "platform"
+  reviewer: "tbd"
+tracks: [api]
+owasp:
+  web: []
+  api: ["API6:2023-Unrestricted Access to Sensitive Business Flows", "API5:2023-Broken Function Level Authorization"]
+cwe: [915]
+prerequisites: [web-http-01]
+topology: "single container: profile api (stdlib python)"
+targets:
+  - name: profileapi
+    image: "local/kingaweb-api-mass-01@sha256:LOCAL_BUILD"
+    ports: [8080]
+    healthcheck: { path: /healthz, port: 8080, timeoutSeconds: 5 }
+    resources: { cpu: "0.25", memory: "128Mi", pids: 32, diskMb: 128 }
+    readonlyFs: true
+network: { egress: deny, allowMocks: [] }
+session: { ttlMinutes: 45, maxExtendOnceMinutes: 15 }
+objectives:
+  - id: mass-assign
+    title: "PATCH role=admin into your profile, read /admin/flag"
+    flag: { validator: hmac, objectiveId: mass-assign }
+    evidenceRequired: true
+hints:
+  - { level: 1, text: "PATCH accepts JSON. Which keys does it copy blindly?...", cost: 5 }
+  - { level: 2, text: "Send {\"role\": \"admin\"} alongside nickname...", cost: 15 }
+guidedSteps:
+  - { checkpoint: map, title: "Profile", body: "Login; GET /api/v1/me; note writable fields." }
+  - { checkpoint: test, title: "Over-bind", body: "PATCH role upgrade; capture /admin/flag." }
+  - { checkpoint: fix, title: "Remediate", body: "Explicit bind allowlist; role stays user." }
+remediation: { summary: "Explicit allowlist of bindable fields; roles change only via admin flow.", retest: "PATCH role → ignored; /admin/flag → 403." }
+blueTeam:
+  logBundle: "blue-team.json"
+  detectionGoal: "Alert on role fields in profile-update payloads"
+  sampleQuerySplunk: 'index=lab uri="/api/v1/profile" role=* | stats count by user'
+tutorPolicy: { guidedMaxLevel: 2, challengeDiscloses: methodology-only, assessmentDiscloses: none }
+ctf: { basePoints: 350, floor: 100, firstBloodBonus: true }
+resetStrategy: recreate

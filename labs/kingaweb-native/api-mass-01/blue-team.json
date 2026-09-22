@@ -1,0 +1,1 @@
+{"bundle": "api-mass-01 synthetic logs", "logs": [{"ts": "2026-09-22T10:00:01Z", "user": "user", "uri": "/api/v1/profile", "status": 200}, {"ts": "2026-09-22T10:01:12Z", "user": "user", "uri": "/api/v1/profile", "body": "{\"role\":\"admin\"}", "status": 200, "note": "SUSPICIOUS role in payload"}], "splunk": "index=lab uri=\"/api/v1/profile\" role=* | stats count by user"}

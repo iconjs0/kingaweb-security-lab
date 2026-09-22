@@ -1,0 +1,48 @@
+apiVersion: lab.kingaweb.io/v1
+kind: Lab
+metadata:
+  id: api-bola-01
+  slug: api-bola-01
+  version: 0.1.0
+  title: "API BOLA: Yours, Mine, and the SSN Field"
+  summary: "Read another user's invoice plus a sensitive property, then enforce both checks."
+  difficulty: intermediate
+  timeMinutes: 45
+  author: "platform"
+  reviewer: "tbd"
+tracks: [api]
+owasp:
+  web: []
+  api: ["API1:2023-Broken Object Level Authorization", "API3:2023-Broken Object Property Level Authorization"]
+cwe: [639, 213]
+prerequisites: [web-http-01]
+topology: "single container: invoices api (stdlib python)"
+targets:
+  - name: invoices
+    image: "local/kingaweb-api-bola-01@sha256:LOCAL_BUILD"
+    ports: [8080]
+    healthcheck: { path: /healthz, port: 8080, timeoutSeconds: 5 }
+    resources: { cpu: "0.25", memory: "128Mi", pids: 32, diskMb: 128 }
+    readonlyFs: true
+network: { egress: deny, allowMocks: [] }
+session: { ttlMinutes: 60, maxExtendOnceMinutes: 15 }
+objectives:
+  - id: bola-read
+    title: "Read bob's invoice + ssn as alice, take the flag"
+    flag: { validator: hmac, objectiveId: bola-read }
+    evidenceRequired: true
+hints:
+  - { level: 1, text: "Login tells you your invoice IDs. IDs look guessable...", cost: 5 }
+  - { level: 2, text: "GET the other invoice; compare which fields a stranger should see...", cost: 15 }
+guidedSteps:
+  - { checkpoint: map, title: "Inventory", body: "Login as alice; list invoice IDs and fields." }
+  - { checkpoint: test, title: "Cross-object read", body: "Fetch bob's invoice; capture flag + ssn leak." }
+  - { checkpoint: fix, title: "Remediate", body: "Owner check + property allowlist; foreign read → 403." }
+remediation: { summary: "Per-object ownership + per-property allowlists on every response.", retest: "Foreign invoice → 403; ssn absent for non-owners." }
+blueTeam:
+  logBundle: "blue-team.json"
+  detectionGoal: "Alert on cross-owner object reads"
+  sampleQuerySplunk: 'index=lab uri="/api/v1/invoices/*" owner!=caller status=200 | stats count by caller'
+tutorPolicy: { guidedMaxLevel: 2, challengeDiscloses: methodology-only, assessmentDiscloses: none }
+ctf: { basePoints: 400, floor: 100, firstBloodBonus: true }
+resetStrategy: recreate

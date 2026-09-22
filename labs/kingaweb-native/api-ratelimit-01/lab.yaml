@@ -1,0 +1,48 @@
+apiVersion: lab.kingaweb.io/v1
+kind: Lab
+metadata:
+  id: api-ratelimit-01
+  slug: api-ratelimit-01
+  version: 0.1.0
+  title: "API Abuse: Coupon Redemption Without Limits"
+  summary: "Redeem one coupon forever, then cap the business flow."
+  difficulty: beginner
+  timeMinutes: 30
+  author: "platform"
+  reviewer: "tbd"
+tracks: [api]
+owasp:
+  web: []
+  api: ["API4:2023-Unrestricted Resource Consumption"]
+cwe: [770, 799]
+prerequisites: [web-http-01]
+topology: "single container: coupons api (stdlib python)"
+targets:
+  - name: coupons
+    image: "local/kingaweb-api-ratelimit-01@sha256:LOCAL_BUILD"
+    ports: [8080]
+    healthcheck: { path: /healthz, port: 8080, timeoutSeconds: 5 }
+    resources: { cpu: "0.25", memory: "128Mi", pids: 32, diskMb: 128 }
+    readonlyFs: true
+network: { egress: deny, allowMocks: [] }
+session: { ttlMinutes: 30, maxExtendOnceMinutes: 15 }
+objectives:
+  - id: abuse-redeem
+    title: "Redeem WELCOME10 five times, take the flag"
+    flag: { validator: hmac, objectiveId: abuse-redeem }
+    evidenceRequired: true
+hints:
+  - { level: 1, text: "Redeem once, then again. Does the balance notice?...", cost: 0 }
+  - { level: 2, text: "Loop the redeem call 5+ times in curl/Burp...", cost: 5 }
+guidedSteps:
+  - { checkpoint: map, title: "Flow", body: "Login; redeem once; record balance + uses." }
+  - { checkpoint: test, title: "Abuse", body: "Replay to 5 uses; capture the flag." }
+  - { checkpoint: fix, title: "Remediate", body: "Cap redemptions; 3rd attempt → 429." }
+remediation: { summary: "Server-side usage counters + rate limits on value-bearing flows.", retest: "3rd redeem → 429; balance capped." }
+blueTeam:
+  logBundle: "blue-team.json"
+  detectionGoal: "Alert on repeated redemptions of one coupon"
+  sampleQuerySplunk: 'index=lab uri="/api/v1/coupons/redeem" | stats count by user, code | where count>2'
+tutorPolicy: { guidedMaxLevel: 2, challengeDiscloses: methodology-only, assessmentDiscloses: none }
+ctf: { basePoints: 250, floor: 100, firstBloodBonus: false }
+resetStrategy: recreate

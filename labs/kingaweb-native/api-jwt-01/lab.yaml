@@ -1,0 +1,48 @@
+apiVersion: lab.kingaweb.io/v1
+kind: Lab
+metadata:
+  id: api-jwt-01
+  slug: api-jwt-01
+  version: 0.1.0
+  title: "API JWT: The alg=none Trap"
+  summary: "Forge an admin token by downgrading the algorithm, then enforce verification."
+  difficulty: intermediate
+  timeMinutes: 45
+  author: "platform"
+  reviewer: "tbd"
+tracks: [api]
+owasp:
+  web: []
+  api: ["API2:2023-Broken Authentication"]
+cwe: [347, 639]
+prerequisites: [web-cookies-01]
+topology: "single container: jwt api (stdlib python, hand-rolled JWT)"
+targets:
+  - name: jwtapi
+    image: "local/kingaweb-api-jwt-01@sha256:LOCAL_BUILD"
+    ports: [8080]
+    healthcheck: { path: /healthz, port: 8080, timeoutSeconds: 5 }
+    resources: { cpu: "0.25", memory: "128Mi", pids: 32, diskMb: 128 }
+    readonlyFs: true
+network: { egress: deny, allowMocks: [] }
+session: { ttlMinutes: 45, maxExtendOnceMinutes: 15 }
+objectives:
+  - id: jwt-none
+    title: "Mint an unsigned admin JWT, read /admin/flag"
+    flag: { validator: hmac, objectiveId: jwt-none }
+    evidenceRequired: true
+hints:
+  - { level: 1, text: "Decode your token (3 base64 parts). What does the header promise?...", cost: 5 }
+  - { level: 2, text: "Rebuild the token with alg none + admin claims, empty signature...", cost: 15 }
+guidedSteps:
+  - { checkpoint: map, title: "Anatomy", body: "Login; split the JWT; read header vs claims." }
+  - { checkpoint: test, title: "Downgrade", body: "Forge alg=none admin token; capture the flag." }
+  - { checkpoint: fix, title: "Remediate", body: "Enforce HS256 + signature; none → 403." }
+remediation: { summary: "Fixed allowlisted algs, mandatory signature verify, short expiries.", retest: "alg=none and tampered tokens → 403." }
+blueTeam:
+  logBundle: "blue-team.json"
+  detectionGoal: "Alert on alg=none or unknown-alg tokens at the edge"
+  sampleQuerySplunk: 'index=lab uri="/admin/*" jwt_alg!=HS256 | stats count by alg'
+tutorPolicy: { guidedMaxLevel: 2, challengeDiscloses: methodology-only, assessmentDiscloses: none }
+ctf: { basePoints: 400, floor: 100, firstBloodBonus: true }
+resetStrategy: recreate
