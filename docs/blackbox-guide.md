@@ -1,6 +1,6 @@
 # Blackbox Guide (explore + test it yourself)
 
-Three self-serve scripts. No source reading required — they only use HTTP, `docker compose` and the built app.
+Five self-serve scripts. No source reading required — they only use HTTP, `docker compose` and the built app.
 
 ## 1-click runs (from repo root)
 
@@ -8,6 +8,7 @@ Three self-serve scripts. No source reading required — they only use HTTP, `do
 ./scripts/blackbox/bb-docker.sh                 # stack: postgres/redis/api/tutor/mpesa
 ./scripts/blackbox/bb-api.sh                    # 21 API checks (auth, isolation, flags, SSRF, RBAC, policy)
 ./scripts/blackbox/bb-orchestrator.sh           # 2-learner isolation, relay lifecycle, policy refuse
+./scripts/blackbox/bb-learning.sh               # 13 mode/hint/finalize checks (guided→assessment→demo)
 ./scripts/blackbox/bb-frontend.sh               # build + 7 routes + markers (or --skip-build)
 npm run validate                                # manifests + contracts + scoring
 ```
