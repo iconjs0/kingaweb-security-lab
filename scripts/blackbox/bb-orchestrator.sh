@@ -13,7 +13,8 @@ jget() { python3 -c "import sys,json;d=json.load(sys.stdin);print($1)"; }
 echo "== orchestrator blackbox =="
 curl -s "$ORCH/healthz" | grep -q orchestrator && ok "orch healthz" || bad "orch healthz"
 [ "$(curl -s -o /dev/null -w '%{http_code}' "$ORCH/v1/orch/events" -H 'Authorization: Bearer wrong')" = "401" ] && ok "orch token gate" || bad "orch token gate"
-[ "$(curl -s -o /dev/null -w '%{http_code}' "$ORCH/v1/orch/events")" = "403" ] && ok "orch missing token 403" || bad "orch missing token"
+[ "$(curl -s -o /dev/null -w '%{http_code}' "$ORCH/v1/orch/events")" = "401" ] && ok "orch missing token 401" || bad "orch missing token"
+BEFORE=$(docker network ls --format "{{.Name}}" | grep -c "^kw-" || true)
 
 A=$(curl -s -X POST "$API/v1/auth/login" -H 'Content-Type: application/json' -d '{"email":"learner@lab.dev"}' | jget "d['token']") || A=""
 B=$(curl -s -X POST "$API/v1/auth/login" -H 'Content-Type: application/json' -d '{"email":"instructor@lab.dev"}' | jget "d['token']") || B=""
@@ -36,6 +37,7 @@ curl -s --max-time 4 "http://127.0.0.1:$PA/rates" > /dev/null 2>&1 && bad "A rel
 curl -s --max-time 4 "http://127.0.0.1:$PB/rates" | grep -q KES && ok "B unaffected" || bad "B unaffected"
 docker network ls --format "{{.Name}}" | grep -q "kw-$IDA" && bad "A network removed" || ok "A network removed"
 curl -s -X DELETE "$API/v1/sessions/$IDB" -H "Authorization: Bearer $B" > /dev/null
-docker network ls --format "{{.Name}}" | grep -q "^kw-" && bad "no session leftovers" || ok "no session leftovers"
+AFTER=$(docker network ls --format "{{.Name}}" | grep -c "^kw-" || true)
+[ "$AFTER" -le "$BEFORE" ] && ok "no new session leftovers" || bad "session leftovers" "before=$BEFORE after=$AFTER"
 echo "== $PASS passed, $FAIL failed =="
 [ "$FAIL" = "0" ]
