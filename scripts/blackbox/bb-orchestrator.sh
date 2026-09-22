@@ -29,7 +29,13 @@ curl -s "http://127.0.0.1:$PA/rates" | grep -q KES && curl -s "http://127.0.0.1:
 [ "$(curl -s -o /dev/null -w '%{http_code}' "$API/v1/sessions/$IDA" -H "Authorization: Bearer $B")" = "403" ] && ok "cross-learner session 403" || bad "cross-learner"
 
 REF=$(curl -s -X POST "$API/v1/sessions" -H "Authorization: Bearer $A" -H 'Content-Type: application/json' -d '{"lab":"web-idor-01@0.1.0"}')
-echo "$REF" | grep -q "refused" && ok "placeholder image refused (policy)" || bad "policy refuse" "$REF"
+echo "$REF" | grep -q '"provisioned":true' && ok "idor retired-placeholder now launches" || bad "idor launch" "$REF"
+RID=$(echo "$REF" | python3 -c "import sys,json;print(json.load(sys.stdin)['id'])")
+curl -s -X DELETE "$API/v1/sessions/$RID" -H "Authorization: Bearer $A" > /dev/null
+OT=$(grep ORCHESTRATOR_TOKEN .env 2>/dev/null | cut -d= -f2 || echo "")
+if [ -n "$OT" ]; then
+  [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$ORCH/v1/orch/sessions" -H "Authorization: Bearer $OT" -H 'Content-Type: application/json' -d '{"session_id":"bb-evil","lab_slug":"nope","lab_version":"9.9.9","ttl_minutes":60}')" = "403" ] && ok "orch unknown manifest refused" || bad "orch manifest gate"
+fi
 
 curl -s -X DELETE "$API/v1/sessions/$IDA" -H "Authorization: Bearer $A" | grep -q destroyed && ok "A destroyed" || bad "A destroy"
 sleep 2

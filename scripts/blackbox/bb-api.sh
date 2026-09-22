@@ -40,7 +40,9 @@ echo "$G" | grep -q '"correct":true' && ok "HMAC flag roundtrip + scored" || bad
 curl -s "$BASE/v1/progress" -H "Authorization: Bearer $LT" | grep -Eq '"solves":[1-9]' && ok "progress counts solve" || bad "progress"
 
 REF=$(curl -s -X POST "$BASE/v1/sessions" -H "Authorization: Bearer $LT" -H 'Content-Type: application/json' -d '{"lab":"web-idor-01@0.1.0"}')
-echo "$REF" | grep -q "refused" && ok "unpinned image refused (policy)" || bad "policy refuse" "$REF"
+echo "$REF" | grep -q '"provisioned":true' && ok "idor retired-placeholder now launches" || bad "idor launch" "$REF"
+RID=$(echo "$REF" | jget "['id']")
+curl -s -X DELETE "$BASE/v1/sessions/$RID" -H "Authorization: Bearer $LT" > /dev/null
 
 [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/v1/sessions/$S1/requests" -H "Authorization: Bearer $LT" -H 'Content-Type: application/json' -d '{"method":"GET","host":"169.254.169.254","path":"/"}')" = "403" ] && ok "console SSRF host denied" || bad "console SSRF"
 RELAY=$(curl -s -X POST "$BASE/v1/sessions/$S1/requests" -H "Authorization: Bearer $LT" -H 'Content-Type: application/json' -d '{"method":"GET","host":"127.0.0.1","path":"/rates"}')
