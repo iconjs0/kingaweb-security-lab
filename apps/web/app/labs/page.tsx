@@ -1,26 +1,35 @@
 "use client";
-import { useMemo, useState } from "react";
-import { LabTable, Panel } from "@kingaweb/design-system";
-import { LABS } from "../../lib/labs";
+import { useEffect, useMemo, useState } from "react";
+import { Badge, LabTable, Panel } from "@kingaweb/design-system";
+import { LABS, type Lab } from "../../lib/labs";
+import { fetchLabs } from "../../lib/api";
 
 export default function Catalogue() {
   const [q, setQ] = useState("");
   const [track, setTrack] = useState("all");
   const [difficulty, setDifficulty] = useState("all");
+  const [labs, setLabs] = useState<Lab[]>(LABS);
+  const [live, setLive] = useState(false);
+  useEffect(() => {
+    fetchLabs().then(({ labs, live }) => {
+      setLabs(labs);
+      setLive(live);
+    });
+  }, []);
   const rows = useMemo(
     () =>
-      LABS.filter(
+      labs.filter(
         (l) =>
           (track === "all" || l.track === track) &&
           (difficulty === "all" || l.difficulty === difficulty) &&
-          (q === "" || `${l.title} ${l.slug} ${l.owasp.join(" ")}`.toLowerCase().includes(q.toLowerCase()))
+          (q === "" || `${l.title} ${l.slug}`.toLowerCase().includes(q.toLowerCase()))
       ).map((l) => ({ slug: l.slug, title: l.title, track: l.track, difficulty: l.difficulty, time: `${l.timeMinutes} min` })),
-    [q, track, difficulty]
+    [q, track, difficulty, labs]
   );
   return (
     <div className="stack">
       <div>
-        <p className="kicker">Catalogue</p>
+        <p className="kicker">Catalogue <Badge tone={live ? "ok" : undefined}>{live ? "live API" : "static fallback"}</Badge></p>
         <h1 style={{ margin: "0 0 8px" }}>Labs</h1>
         <p style={{ color: "var(--text-2)", marginTop: 0 }}>Filter by track, difficulty or tool. Full OWASP/API coverage lands across Phase 5.</p>
       </div>

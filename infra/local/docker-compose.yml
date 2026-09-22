@@ -30,6 +30,31 @@ services:
       timeout: 3s
       retries: 10
 
+  api:
+    build: ../../services/api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_URL: postgresql://lab:lab_dev_only@postgres:5432/lab
+      FLAG_HMAC_SECRET: ${FLAG_HMAC_SECRET:?set FLAG_HMAC_SECRET in .env}
+      ALLOW_DEV_MINT: "true" # local only — production overlay forces false
+      LABS_ROOT: /labs
+    env_file:
+      - path: ../../.env
+        required: false
+    volumes:
+      - ../../labs:/labs:ro
+    ports:
+      - "8000:8000"
+    networks: [default, labnet]
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/healthz\")'"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
   tutor-stub:
     build: ../../services/tutor
     restart: unless-stopped
@@ -47,6 +72,9 @@ services:
     restart: unless-stopped
     environment:
       MPESA_CALLBACK_SECRET: ${FLAG_HMAC_SECRET:-dev-only-mock-secret}
+    env_file:
+      - path: ../../.env
+        required: false
     ports:
       - "5009:5009"
     networks: [labnet]
