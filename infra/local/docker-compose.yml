@@ -74,7 +74,8 @@ services:
       ALLOW_UNSIGNED_MANIFESTS: "true" # local only — production requires signatures
       ALLOW_DEV_DIGESTS: "true" # local only — production requires pinned digests
       LABS_ROOT: /labs
-      ORCH_ALLOWLIST: local-mpesa-mock
+      ORCH_ALLOWLIST: local-mpesa-mock,local-lab-web-http-01,local-lab-web-cookies-01,local-lab-web-headers-01,local-lab-web-authz-01,local-lab-web-report-01
+      ORCH_IMAGE_MAP: '{"local/kingaweb-mpesa-mock": "local-mpesa-mock", "local/kingaweb-web-http-01": "local-lab-web-http-01", "local/kingaweb-web-cookies-01": "local-lab-web-cookies-01", "local/kingaweb-web-headers-01": "local-lab-web-headers-01", "local/kingaweb-web-authz-01": "local-lab-web-authz-01", "local/kingaweb-web-report-01": "local-lab-web-report-01"}'
     env_file:
       - path: ../../.env
         required: false

@@ -51,3 +51,12 @@ jobs:
         env:
           ALLOW_UNSIGNED_MANIFESTS: "true"
           ALLOW_DEV_DIGESTS: "true"
+  curriculum:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install pyyaml
+      - run: npm run validate
+      - run: python -m pytest labs/tests/ -q

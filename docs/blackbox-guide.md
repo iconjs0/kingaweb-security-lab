@@ -5,12 +5,15 @@ Five self-serve scripts. No source reading required — they only use HTTP, `doc
 ## 1-click runs (from repo root)
 
 ```bash
+./scripts/build-lab-images.sh                   # build 6 target images (root context for flag SDK)
 ./scripts/blackbox/bb-docker.sh                 # stack: postgres/redis/api/tutor/mpesa
 ./scripts/blackbox/bb-api.sh                    # 21 API checks (auth, isolation, flags, SSRF, RBAC, policy)
 ./scripts/blackbox/bb-orchestrator.sh           # 2-learner isolation, relay lifecycle, policy refuse
 ./scripts/blackbox/bb-learning.sh               # 13 mode/hint/finalize checks (guided→assessment→demo)
+./scripts/blackbox/bb-curriculum.sh             # 6 Wave-1 solves with real per-session flags
 ./scripts/blackbox/bb-frontend.sh               # build + 7 routes + markers (or --skip-build)
 npm run validate                                # manifests + contracts + scoring
+python3 -m pytest labs/tests/ -q                # golden vuln/fixed regression (no docker)
 ```
 
 Each prints `PASS/FAIL` lines and exits non-zero on failure.
