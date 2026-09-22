@@ -32,23 +32,33 @@ def run_target(cli, sid: str, net, target: dict, resources: dict | None = None,
     # NOTE: no published ports — session nets are internal (Docker gives null
     # bindings there). Access flows via loopback relays (relay.py) instead.
     res = resources or {}
-    container = cli.containers.run(
-        target["runtime_image"],
-        name=f"kw-{sid}-{target['name']}",
-        detach=True,
-        network=net.name,
-        labels={LABEL: sid, "kingaweb.target": target["name"]},
-        user=RUN_USER,
-        read_only=True,
-        tmpfs={"/tmp": "size=64m,mode=1777"},
+    # short-name alias so session targets reach each other by target name
+    # (kw-<sid>-<name> is the DNS name by default, which labs must never hardcode).
+    # Low-level create: the high-level run() drops networking_config when
+    # network= is also passed.
+    res = resources or {}
+    hostcfg = cli.api.create_host_config(
         mem_limit=parse_mem(res.get("memory", "256m")),
         nano_cpus=int(float(res.get("cpu", "0.5")) * 1e9),
         pids_limit=res.get("pids", 64),
+        read_only=True,
+        tmpfs={"/tmp": "size=64m,mode=1777"},
         cap_drop=["ALL"],
         security_opt=["no-new-privileges"],
-        environment=env or {},
     )
-    return container
+    netcfg = cli.api.create_networking_config({
+        net.name: cli.api.create_endpoint_config(aliases=[target["name"]])})
+    cc = cli.api.create_container(
+        target["runtime_image"],
+        name=f"kw-{sid}-{target['name']}",
+        user=RUN_USER,
+        environment=env or {},
+        labels={LABEL: sid, "kingaweb.target": target["name"]},
+        host_config=hostcfg,
+        networking_config=netcfg,
+    )
+    cli.api.start(cc.get("Id"))
+    return cli.containers.get(cc.get("Id"))
 
 def container_ip(container, net_name: str) -> str | None:
     container.reload()
@@ -82,21 +92,47 @@ def destroy_session(cli, sid: str) -> dict:
             pass
     return removed
 
+GRACE_SECONDS = 180  # never sweep fresh containers (in-flight provisions, live tests)
+
+def _age_seconds(started_at: str) -> float:
+    import datetime as _dt
+    import re as _re
+    try:
+        s = (started_at or "").replace("Z", "+00:00")
+        # docker emits nanoseconds; fromisoformat takes microseconds max
+        s = _re.sub(r"(\.\d{6})\d+", r"\1", s)
+        ts = _dt.datetime.fromisoformat(s)
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=_dt.timezone.utc)
+        return (_dt.datetime.now(_dt.timezone.utc) - ts).total_seconds()
+    except Exception:
+        return float("inf")
+
 def reconcile(cli, live: set[str]) -> dict:
     """Destroy labelled leftovers with no live lease (post-crash cleanup)."""
     out = {"containers": 0, "networks": 0}
+    young: set[str] = set()
     try:
         for c in cli.containers.list(all=True, filters={"label": LABEL}):
             sid = (c.labels or {}).get(LABEL, "")
-            if sid and sid not in live:
-                try:
-                    c.remove(force=True)
-                    out["containers"] += 1
-                except Exception:
-                    pass
+            if not sid or sid in live:
+                continue
+            try:
+                c.reload()
+                age = _age_seconds(c.attrs.get("State", {}).get("StartedAt", ""))
+            except Exception:
+                age = float("inf")
+            if age < GRACE_SECONDS:
+                young.add(sid)
+                continue
+            try:
+                c.remove(force=True)
+                out["containers"] += 1
+            except Exception:
+                pass
         for n in cli.networks.list(filters={"label": LABEL}):
             sids = [v for k, v in (n.attrs.get("Labels") or {}).items() if k == LABEL]
-            if sids and all(s not in live for s in sids):
+            if sids and all(s not in live and s not in young for s in sids):
                 try:
                     n.remove()
                     out["networks"] += 1
