@@ -37,7 +37,7 @@ services:
       - "5008:5008"
     networks: [labnet]
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:5008/healthz"]
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:5008/healthz\")'"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -51,7 +51,7 @@ services:
       - "5009:5009"
     networks: [labnet]
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:5009/healthz"]
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:5009/healthz\")'"]
       interval: 10s
       timeout: 3s
       retries: 5
