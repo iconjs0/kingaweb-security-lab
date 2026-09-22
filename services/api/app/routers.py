@@ -181,7 +181,17 @@ def reset(sid: str, db: DBSession = Depends(get_db), user: User = Depends(curren
 @router.delete("/v1/sessions/{sid}")
 def destroy(sid: str, db: DBSession = Depends(get_db), user: User = Depends(current_user)):
     s = own_session(db, sid, user)
-    if orch_client.base():
+    if orch_client.base() and not getattr(s, "targets_json", "[]") == "[]":
+        # provisioned session: never report destroyed while containers may live
+        try:
+            code, resp = orch_client.destroy(sid)
+            if code not in (200, 404):
+                raise HTTPException(502, f"orchestrator destroy failed: {resp}")
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(502, f"orchestrator unreachable, session kept active: {e}")
+    elif orch_client.base():
         try:
             orch_client.destroy(sid)
         except Exception as e:

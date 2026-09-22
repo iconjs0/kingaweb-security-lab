@@ -77,6 +77,7 @@ def wait_ready(url: str, timeout_s: int = 30) -> bool:
     return False
 
 def destroy_session(cli, sid: str) -> dict:
+    import time as _t
     removed = {"containers": 0, "networks": 0}
     for c in cli.containers.list(all=True, filters={"label": f"{LABEL}={sid}"}):
         try:
@@ -84,12 +85,18 @@ def destroy_session(cli, sid: str) -> dict:
             removed["containers"] += 1
         except Exception:
             pass
-    for n in cli.networks.list(filters={"label": f"{LABEL}={sid}"}):
-        try:
-            n.remove()
-            removed["networks"] += 1
-        except Exception:
-            pass
+    # endpoint detachment races container removal; retry the network drops
+    for _ in range(4):
+        pending = cli.networks.list(filters={"label": f"{LABEL}={sid}"})
+        if not pending:
+            break
+        _t.sleep(2)
+        for n in pending:
+            try:
+                n.remove()
+                removed["networks"] += 1
+            except Exception:
+                pass
     return removed
 
 GRACE_SECONDS = 180  # never sweep fresh containers (in-flight provisions, live tests)
