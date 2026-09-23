@@ -83,6 +83,29 @@ class HintUnlock(Base):
     cost: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+class Finding(Base):
+    __tablename__ = "findings"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(String(64), index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str] = mapped_column(Text, default="")
+    evidence: Mapped[str] = mapped_column(Text, default="")
+    impact: Mapped[str] = mapped_column(Text, default="")
+    cwe: Mapped[str] = mapped_column(String(64), default="")
+    owasp: Mapped[str] = mapped_column(String(128), default="")
+    remediation: Mapped[str] = mapped_column(Text, default="")
+    retest: Mapped[str] = mapped_column(Text, default="")
+    severity: Mapped[str] = mapped_column(String(32), default="medium")
+    status: Mapped[str] = mapped_column(String(32), default="draft")
+    created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+class Note(Base):
+    __tablename__ = "notes"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(String(64), index=True)
+    body: Mapped[str] = mapped_column(Text, default="")
+    updated_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
 class Audit(Base):
     __tablename__ = "audit"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

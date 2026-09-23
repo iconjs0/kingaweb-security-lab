@@ -14,7 +14,7 @@ from .auth import current_user, login_dev, require_roles
 from .db import get_db
 from . import orch as orch_client
 from .flags import flag_hash, mint_flag, new_seed_hex, score_solve, verify_flag
-from .models import Audit, Competition, Enrollment, Lab, Membership, Session, Submission, Team, User, HintUnlock
+from .models import Audit, Competition, Enrollment, Lab, Membership, Session, Submission, Team, User, HintUnlock, Finding, Note
 
 router = APIRouter()
 _attempts: dict[str, list[float]] = {}  # session_id -> submit timestamps (rate limit)
@@ -279,6 +279,143 @@ def finalize(sid: str, db: DBSession = Depends(get_db), user: User = Depends(cur
     db.commit()
     return {"session": sid, "solves": len(subs), "gross": gross, "hint_cost": hints,
             "time_bonus": time_bonus, "net": gross + time_bonus, "immutable": True}
+
+# ---- evidence: findings, notes, reports ----
+FINDING_FIELDS = ["title", "description", "evidence", "impact", "cwe", "remediation", "retest"]
+
+class FindingIn(BaseModel):
+    title: str = ""
+    description: str = ""
+    evidence: str = ""
+    impact: str = ""
+    cwe: str = ""
+    owasp: str = ""
+    remediation: str = ""
+    retest: str = ""
+    severity: str = "medium"
+    status: str = "draft"
+
+def _finding_dict(f: "Finding") -> dict:
+    return {"id": f.id, "title": f.title, "description": f.description, "evidence": f.evidence,
+            "impact": f.impact, "cwe": f.cwe, "owasp": f.owasp, "remediation": f.remediation,
+            "retest": f.retest, "severity": f.severity, "status": f.status}
+
+@router.post("/v1/sessions/{sid}/findings", status_code=201)
+def create_finding(sid: str, body: FindingIn, db: DBSession = Depends(get_db), user: User = Depends(current_user)):
+    s = own_session(db, sid, user)
+    if s.status == "destroyed":
+        raise HTTPException(409, "session destroyed")
+    missing = [k for k in FINDING_FIELDS if not str(getattr(body, k, "")).strip()]
+    thin = [k for k in FINDING_FIELDS if k in ("description", "evidence", "impact", "remediation", "retest")
+            and getattr(body, k, "") and len(str(getattr(body, k)).strip()) < 12]
+    if missing or thin:
+        raise HTTPException(422, f"incomplete finding (missing={missing}, thin={thin})")
+    if body.severity not in ("low", "medium", "high", "critical"):
+        raise HTTPException(422, "severity must be low|medium|high|critical")
+    f = Finding(session_id=sid, title=body.title.strip(), description=body.description.strip(),
+                evidence=body.evidence.strip(), impact=body.impact.strip(), cwe=body.cwe.strip(),
+                owasp=body.owasp.strip(), remediation=body.remediation.strip(), retest=body.retest.strip(),
+                severity=body.severity, status=body.status)
+    db.add(f)
+    audit(db, user.id, "finding.create", f"{sid}:{body.title[:40]}")
+    db.commit()
+    db.refresh(f)
+    return _finding_dict(f)
+
+@router.get("/v1/sessions/{sid}/findings")
+def list_findings(sid: str, db: DBSession = Depends(get_db), user: User = Depends(current_user)):
+    own_session(db, sid, user)
+    return [_finding_dict(f) for f in db.query(Finding).filter(Finding.session_id == sid).order_by(Finding.id).all()]
+
+@router.delete("/v1/sessions/{sid}/findings/{fid}")
+def delete_finding(sid: str, fid: int, db: DBSession = Depends(get_db), user: User = Depends(current_user)):
+    own_session(db, sid, user)
+    f = db.query(Finding).filter(Finding.id == fid, Finding.session_id == sid).first()
+    if not f:
+        raise HTTPException(404, "finding not found")
+    db.delete(f)
+    audit(db, user.id, "finding.delete", f"{sid}:{fid}")
+    db.commit()
+    return {"deleted": fid}
+
+class NoteIn(BaseModel):
+    body: str = Field(max_length=20000)
+
+@router.put("/v1/sessions/{sid}/notes")
+def save_notes(sid: str, body: NoteIn, db: DBSession = Depends(get_db), user: User = Depends(current_user)):
+    s = own_session(db, sid, user)
+    if s.status == "destroyed":
+        raise HTTPException(409, "session destroyed")
+    n = db.query(Note).filter(Note.session_id == sid).first()
+    if n:
+        n.body = body.body
+    else:
+        db.add(Note(session_id=sid, body=body.body))
+    audit(db, user.id, "notes.save", sid)
+    db.commit()
+    return {"session": sid, "saved": len(body.body)}
+
+@router.get("/v1/sessions/{sid}/notes")
+def read_notes(sid: str, db: DBSession = Depends(get_db), user: User = Depends(current_user)):
+    own_session(db, sid, user)
+    n = db.query(Note).filter(Note.session_id == sid).first()
+    return {"session": sid, "body": n.body if n else ""}
+
+def _report_data(db: DBSession, s: Session, user: User) -> dict:
+    lab = lab_or_404(db, s.lab_slug, s.lab_version)
+    subs = db.query(Submission).filter(Submission.session_id == s.id).all()
+    hints = db.query(HintUnlock).filter(HintUnlock.session_id == s.id).all()
+    findings = db.query(Finding).filter(Finding.session_id == s.id).order_by(Finding.id).all()
+    notes = db.query(Note).filter(Note.session_id == s.id).first()
+    return {
+        "session": s.id, "lab": f"{s.lab_slug}@{s.lab_version}", "lab_title": lab.title,
+        "mode": getattr(s, "mode", "guided"), "learner": user.email,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "objectives": json.loads(lab.objectives_json),
+        "solves": [{"objective": x.objective_id, "points": x.points} for x in subs if x.correct],
+        "attempts": len(subs), "hint_cost": sum(u.cost for u in hints),
+        "points": sum(x.points for x in subs),
+        "findings": [_finding_dict(f) for f in findings],
+        "notes": notes.body if notes else "",
+    }
+
+@router.get("/v1/sessions/{sid}/report")
+def report_json(sid: str, db: DBSession = Depends(get_db), user: User = Depends(current_user)):
+    s = own_session(db, sid, user)
+    return _report_data(db, s, user)
+
+@router.get("/v1/sessions/{sid}/report.html")
+def report_html(sid: str, db: DBSession = Depends(get_db), user: User = Depends(current_user)):
+    from fastapi.responses import HTMLResponse
+    s = own_session(db, sid, user)
+    d = _report_data(db, s, user)
+    rows = "".join(
+        f"<tr><td>{o['id']}</td><td>{o['title']}</td>"
+        f"<td>{'solved' if any(x['objective'] == o['id'] for x in d['solves']) else 'open'}</td></tr>"
+        for o in d["objectives"])
+    finds = "".join(
+        f"<section><h3>{f['title']} <small>[{f['severity']}]</small></h3>"
+        f"<p><b>Description.</b> {f['description']}</p>"
+        f"<p><b>Evidence.</b> <code>{f['evidence']}</code></p>"
+        f"<p><b>Impact.</b> {f['impact']}</p>"
+        f"<p><b>CWE/OWASP.</b> {f['cwe']} / {f['owasp']}</p>"
+        f"<p><b>Remediation.</b> {f['remediation']}</p>"
+        f"<p><b>Retest.</b> {f['retest']}</p></section>"
+        for f in d["findings"]) or "<p>No findings recorded.</p>"
+    html_doc = f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<title>Assessment report — {d['lab']}</title>
+<style>body{{font-family:sans-serif;max-width:44rem;margin:2rem auto;padding:0 1rem;color:#1c1a15}}
+table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #999;padding:.4rem;text-align:left}}
+code{{background:#eee;padding:.1rem .3rem}}@media print{{body{{margin:0}}}}</style></head>
+<body><h1>{d['lab_title']}</h1>
+<p>Session {d['session']} · {d['lab']} · mode {d['mode']} · learner {d['learner']} · {d['generated_at']}</p>
+<h2>Objectives</h2><table><tr><th>ID</th><th>Title</th><th>Status</th></tr>{rows}</table>
+<p>Solves {len(d['solves'])} · attempts {d['attempts']} · hint cost {d['hint_cost']} · points {d['points']}</p>
+<h2>Findings ({len(d['findings'])})</h2>{finds}
+<h2>Notes</h2><p>{d['notes'] or '—'}</p>
+<footer><small>Authorized training environment. Print to PDF from the browser for archival.</small></footer>
+</body></html>"""
+    return HTMLResponse(html_doc)
 
 # ---- safe console proxy (Phase 7 lite): allowlist + forward to session mocks ----
 ALLOWED_HOSTS = {"mpesa-mock": "http://mpesa-mock:5009", "shop": "http://shop:8080"}

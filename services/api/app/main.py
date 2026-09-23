@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from .db import Base, SessionLocal, engine
 from .models import User  # noqa: F401  (register tables)
-from .models import Team, Membership, Lab, Session, Submission, Competition, Enrollment, HintUnlock, Audit  # noqa: F401
+from .models import Team, Membership, Lab, Session, Submission, Competition, Enrollment, HintUnlock, Finding, Note, Audit  # noqa: F401
 from .routers import router
 from .seed import seed_labs
 
