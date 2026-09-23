@@ -97,6 +97,28 @@ services:
       timeout: 3s
       retries: 5
 
+  intel:
+    build: ../../services/intelligence
+    restart: unless-stopped
+    environment:
+      INTEL_TOKEN: ${INTEL_TOKEN:?set INTEL_TOKEN in .env}
+      INTEL_DB: /data/intel.db
+      INTEL_NVD_LIMIT: "20"
+      SYNC_INTERVAL_HOURS: "24"
+    env_file:
+      - path: ../../.env
+        required: false
+    volumes:
+      - intel-data:/data
+    ports:
+      - "8002:8002"
+    networks: [labnet]
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8002/healthz\")'"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
   mpesa-mock:
     build: ../../labs/mocks/mpesa
     restart: unless-stopped
@@ -120,3 +142,4 @@ networks:
 volumes:
   postgres-data:
   redis-data:
+  intel-data:
