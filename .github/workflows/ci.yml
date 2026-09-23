@@ -60,3 +60,14 @@ jobs:
       - run: pip install pyyaml
       - run: npm run validate
       - run: python -m pytest labs/tests/ -q
+  intelligence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r services/intelligence/requirements.txt
+      - run: python -m pytest services/intelligence/tests/ -q
+        working-directory: services/intelligence
+        env:
+          INTEL_DB: /tmp/opencode-ci-intel.db
