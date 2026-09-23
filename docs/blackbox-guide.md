@@ -14,6 +14,7 @@ Five self-serve scripts. No source reading required — they only use HTTP, `doc
 ./scripts/blackbox/bb-evidence.sh               # 13 findings/notes/report checks
 ./scripts/blackbox/bb-intel.sh                  # 11 KEV/EPSS/NVD sync + priority + review checks
 ./scripts/blackbox/bb-teams.sh                  # 10 classroom checks (teams, assignments, certs)
+./scripts/blackbox/bb-prod.sh                   # 7 prod-posture checks (needs prod overlay up)
 ./scripts/blackbox/bb-frontend.sh               # build + 7 routes + markers (or --skip-build)
 npm run validate                                # manifests + contracts + scoring
 python3 -m pytest labs/tests/ -q                # golden vuln/fixed regression (no docker)
