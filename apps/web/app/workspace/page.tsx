@@ -5,10 +5,10 @@ import { Badge, CommandBlock, FindingCard, ObjectiveList, Panel } from "@kingawe
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const DEV_TOKEN = process.env.NEXT_PUBLIC_DEV_TOKEN ?? "dev-learner";
 
-function HintUnlocker() {
-  const [sid, setSid] = useState("");
+function HintUnlocker({ sid }: { sid: string }) {
   const [out, setOut] = useState<string | null>(null);
   async function unlock() {
+    if (!sid) { setOut("Enter a session id first."); return; }
     setOut("Unlocking…");
     try {
       const r = await fetch(`${API}/v1/sessions/${sid}/hints/unlock`, {
@@ -23,11 +23,7 @@ function HintUnlocker() {
   }
   return (
     <div className="stack">
-      <div className="toolbar">
-        <label className="mono" style={{ fontSize: "var(--fs-small)" }} htmlFor="hint-sid">Session</label>
-        <input id="hint-sid" className="input mono" value={sid} onChange={(e) => setSid(e.target.value)} placeholder="s-…" style={{ maxWidth: 160 }} />
-        <button className="btn btn-sm" type="button" onClick={unlock}>Unlock next hint</button>
-      </div>
+      <button className="btn btn-sm" type="button" onClick={unlock}>Unlock next hint</button>
       {out && <p role="status" style={{ fontSize: "var(--fs-small)", margin: 0 }}>{out}</p>}
       <p style={{ fontSize: "var(--fs-small)", color: "var(--text-2)", margin: 0 }}>
         Sequential unlocks; costs deduct from score. Assessment caps at 1.
@@ -36,10 +32,79 @@ function HintUnlocker() {
   );
 }
 
+const FIELDS = ["title", "description", "evidence", "impact", "cwe", "remediation", "retest"] as const;
+
+function EvidenceKit({ sid }: { sid: string }) {
+  const [notes, setNotes] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  const [form, setForm] = useState<Record<string, string>>({ title: "", description: "", evidence: "", impact: "", cwe: "", remediation: "", retest: "" });
+  const [findings, setFindings] = useState<{ id: number; title: string; severity: string }[]>([]);
+  async function call(path: string, opts?: RequestInit) {
+    const r = await fetch(`${API}${path}`, { ...opts, headers: { Authorization: `Bearer ${DEV_TOKEN}`, "Content-Type": "application/json", ...(opts?.headers || {}) } });
+    if (!r.ok) throw new Error(`${r.status}: ${JSON.stringify(await r.json()).slice(0, 160)}`);
+    return r.json();
+  }
+  async function loadAll() {
+    if (!sid) { setMsg("Enter a session id first."); return; }
+    try {
+      const [n, f] = await Promise.all([
+        call(`/v1/sessions/${sid}/notes`),
+        call(`/v1/sessions/${sid}/findings`),
+      ]);
+      setNotes(n.body || "");
+      setFindings(f);
+      setMsg(`Loaded ${f.length} finding(s).`);
+    } catch (e) { setMsg(`Load failed: ${e}`); }
+  }
+  async function saveNotes() {
+    try { await call(`/v1/sessions/${sid}/notes`, { method: "PUT", body: JSON.stringify({ body: notes }) }); setMsg("Notes saved."); }
+    catch (e) { setMsg(`Save failed: ${e}`); }
+  }
+  async function addFinding() {
+    try {
+      const f = await call(`/v1/sessions/${sid}/findings`, { method: "POST", body: JSON.stringify({ ...form, severity: "high" }) });
+      setFindings((xs) => [...xs, f]);
+      setMsg(`Finding #${f.id} recorded.`);
+    } catch (e) { setMsg(`Rejected: ${e}`); }
+  }
+  return (
+    <div className="stack">
+      <div className="toolbar">
+        <button className="btn btn-sm" type="button" onClick={loadAll}>Load evidence</button>
+        <span style={{ display: "flex", gap: 8 }}>
+          <a className="btn btn-sm" href={sid ? `${API}/v1/sessions/${sid}/report.html` : "#"}>HTML report</a>
+          <a className="btn btn-sm" href={sid ? `${API}/v1/sessions/${sid}/report` : "#"}>JSON</a>
+        </span>
+      </div>
+      {msg && <p role="status" style={{ fontSize: "var(--fs-small)", margin: 0 }}>{msg}</p>}
+      <div className="field">
+        <label htmlFor="notes">Notes (persisted per session)</label>
+        <textarea id="notes" className="input" rows={5} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Observation → evidence → impact…" />
+        <div><button className="btn btn-sm" type="button" onClick={saveNotes}>Save notes</button></div>
+      </div>
+      <div className="stack">
+        {FIELDS.map((k) => (
+          <div className="field" key={k}>
+            <label htmlFor={`f-${k}`}>{k}</label>
+            <input id={`f-${k}`} className="input mono" value={form[k]} onChange={(e) => setForm({ ...form, [k]: e.target.value })} placeholder={k} />
+          </div>
+        ))}
+        <div><button className="btn btn-primary btn-sm" type="button" onClick={addFinding}>Record finding</button></div>
+      </div>
+      {findings.length > 0 && (
+        <ul style={{ margin: 0, paddingLeft: 18, fontSize: "var(--fs-small)" }}>
+          {findings.map((f) => <li key={f.id}>#{f.id} {f.title} [{f.severity}]</li>)}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export default function Workspace() {
   const [method, setMethod] = useState("GET");
   const [path, setPath] = useState("/orders/102");
   const [sent, setSent] = useState<string | null>(null);
+  const [sid, setSid] = useState("");
   return (
     <div className="stack">
       <div className="toolbar">
@@ -48,6 +113,8 @@ export default function Workspace() {
           <h1 style={{ margin: "0 0 4px" }}>Workspace</h1>
         </div>
         <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+          <label className="mono" style={{ fontSize: "var(--fs-small)" }} htmlFor="ws-sid">Session</label>
+          <input id="ws-sid" className="input mono" value={sid} onChange={(e) => setSid(e.target.value)} placeholder="s-…" style={{ maxWidth: 150 }} />
           <Badge tone="ok">expires 42:10</Badge>
           <button className="btn btn-sm" type="button">Extend</button>
           <button className="btn btn-sm" type="button">Reset</button>
@@ -63,7 +130,7 @@ export default function Workspace() {
             <p className="mono" style={{ fontSize: "var(--fs-small)" }}>browser → api → session-net → shop:8080 (read-only fs, no egress)</p>
           </Panel>
           <Panel title="Hints (live)">
-            <HintUnlocker />
+            <HintUnlocker sid={sid} />
           </Panel>
         </div>
         <div className="stack">
@@ -103,13 +170,11 @@ export default function Workspace() {
           />
         </div>
         <div className="stack">
-          <Panel title="Notes">
-            <label className="mono" style={{ fontSize: "var(--fs-small)" }} htmlFor="notes">Learner notes (redacted snippets only)</label>
-            <textarea id="notes" className="input" rows={8} placeholder="Observation → evidence → impact…" />
+          <Panel title="Notes & findings (live)">
+            <EvidenceKit sid={sid} />
           </Panel>
           <Panel title="Report">
-            <p style={{ fontSize: "var(--fs-small)", color: "var(--text-2)" }}>PDF/HTML export ships in Phase 7.</p>
-            <button className="btn btn-sm" type="button">Preview template</button>
+            <p style={{ fontSize: "var(--fs-small)", color: "var(--text-2)" }}>HTML for print-to-PDF + machine JSON, per session.</p>
           </Panel>
         </div>
       </div>
