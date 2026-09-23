@@ -227,9 +227,11 @@ def submit(sid: str, body: SubmitIn, db: DBSession = Depends(get_db), user: User
     hist.append(now)
     _attempts[sid] = hist
     lab = lab_or_404(db, s.lab_slug, s.lab_version)
-    objectives = [o["id"] for o in json.loads(lab.objectives_json)]
+    objectives = {o["id"]: o for o in json.loads(lab.objectives_json)}
     if body.objective_id not in objectives:
         raise HTTPException(404, "unknown objective")
+    if not objectives[body.objective_id].get("scored", True):
+        raise HTTPException(422, "evidence-only objective: record a Finding for instructor review instead")
     ok = verify_flag(body.flag, s.id, s.lab_version, body.objective_id, s.seed_hex)
     attempts = db.query(Submission).filter(Submission.session_id == sid, Submission.objective_id == body.objective_id).count() + 1
     hint_cost = sum(u.cost for u in db.query(HintUnlock).filter(HintUnlock.session_id == sid).all())

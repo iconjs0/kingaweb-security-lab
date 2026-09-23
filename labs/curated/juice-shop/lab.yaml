@@ -1,0 +1,59 @@
+apiVersion: lab.kingaweb.io/v1
+kind: Lab
+metadata:
+  id: curated-juice-shop
+  slug: curated-juice-shop
+  version: 0.1.0
+  title: "Curated: OWASP Juice Shop (Third-Party)"
+  summary: "The full OWASP Top Ten playground, wrapped with isolation + orientation. Evidence-graded."
+  difficulty: intermediate
+  timeMinutes: 120
+  author: "platform (wrapper); OWASP Juice Shop contributors (upstream)"
+  reviewer: "tbd"
+tracks: [web]
+origin:
+  thirdParty: true
+  project: "OWASP Juice Shop"
+  upstream: "https://github.com/juice-shop/juice-shop"
+  license: "MIT (© Bjoern Kimminich & contributors 2014–2026; notice in REFERENCES.md)"
+  upstreamRef: "bkimminich/juice-shop@sha256:73c53fbf442e8337b3ea3d98c7e8550308854701ebdfce4cc39768f36b75430e (image 2026-08-11)"
+  reviewed: "2026-09-23"
+  distinction: "Third-party target. Native KingaWeb labs teach each flaw in isolation first; use this for breadth practice. Progress here is evidence-graded by instructors, not auto-scored."
+owasp:
+  web: ["A01:2021", "A02:2021", "A03:2021", "A04:2021", "A05:2021", "A06:2021", "A07:2021", "A08:2021", "A09:2021", "A10:2021"]
+  api: []
+cwe: [79, 89, 352, 639, 918]
+prerequisites: [web-http-01, web-cookies-01]
+topology: "single upstream container in isolated session net (writable-layer exception, see docs/curated-review.md)"
+targets:
+  - name: juiceshop
+    image: "bkimminich/juice-shop@sha256:73c53fbf442e8337b3ea3d98c7e8550308854701ebdfce4cc39768f36b75430e"
+    ports: [3000]
+    healthcheck: { path: /, port: 3000, timeoutSeconds: 120 }
+    resources: { cpu: "1.0", memory: "1024Mi", pids: 256, diskMb: 2048 }
+    readonlyFs: false
+    writableFs: true
+    exception: "Upstream sqlite/seed/ftp/uploads/logs share one tree; tmpfs would shadow seed data. Writable layer stays ephemeral (reset destroys). Non-root, internal net, caps retained. See docs/curated-review.md."
+network: { egress: deny, allowMocks: [] }
+session: { ttlMinutes: 60, maxExtendOnceMinutes: 30 }
+objectives:
+  - id: scoreboard-found
+    title: "Find the hidden score board (evidence-graded, no auto flag)"
+    evidenceRequired: true
+  - id: admin-login
+    title: "Log in as admin via the classic SQLi (evidence-graded, no auto flag)"
+    evidenceRequired: true
+hints:
+  - { level: 1, text: "The score board hides behind an obscure route — dirbust or read the companion guide...", cost: 0 }
+  - { level: 2, text: "Admin login is the documented starter challenge; use KQL-free manual testing...", cost: 0 }
+guidedSteps:
+  - { checkpoint: map, title: "Orientation", body: "Open the relay URL; confirm the shop loads; read the score-board rules." }
+  - { checkpoint: test, title: "Practice", body: "Work challenges; record evidence as Findings in your workspace." }
+  - { checkpoint: fix, title: "Review", body: "Instructor reviews your findings; fixes tracked upstream." }
+remediation: { summary: "Upstream fixes ship with juice-shop releases; harden skills in native labs.", retest: "N/A for wrapper — retest in native equivalents." }
+blueTeam:
+  logBundle: "blue-team.json"
+  detectionGoal: "Alert on automated scanner bursts against the wrapped shop"
+  sampleQuerySplunk: 'index=lab uri="/rest/*" status=401 | stats count by src | where count>50'
+tutorPolicy: { guidedMaxLevel: 2, challengeDiscloses: methodology-only, assessmentDiscloses: none }
+resetStrategy: recreate

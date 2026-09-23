@@ -35,7 +35,8 @@ def seed_labs(db: DBSession, labs_root: str = "labs") -> int:
             ttl_minutes=min(60, int(d.get("session", {}).get("ttlMinutes", 60))),
             objectives_json=json.dumps([
                 {"id": o.get("id"), "title": o.get("title", o.get("id")),
-                 "owasp": ow, "cwe": d.get("cwe", [])}
+                 "owasp": ow, "cwe": d.get("cwe", []),
+                 "scored": isinstance((o.get("flag") or {}).get("objectiveId"), str)}
                 for o in d.get("objectives", [])]),
             targets_json=json.dumps([
                 {"name": t.get("name"), "ports": t.get("ports", []),

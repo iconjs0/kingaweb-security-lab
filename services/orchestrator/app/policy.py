@@ -56,6 +56,10 @@ def check_manifest(d: dict) -> None:
         for banned in ("privileged", "hostNetwork", "mountDockerSock", "hostPid", "hostIpc"):
             if t.get(banned):
                 raise PolicyError(f"target {t.get('name')}: {banned} forbidden")
+    third = bool((d.get("origin") or {}).get("thirdParty"))
+    for t in d.get("targets", []):
+        if t.get("writableFs") and not (third and isinstance(t.get("exception"), str) and t["exception"].strip()):
+            raise PolicyError(f"target {t.get('name')}: writableFs needs curated origin + written exception")
     if not d.get("signature"):
         if os.environ.get("ALLOW_UNSIGNED_MANIFESTS", "false").lower() != "true":
             raise PolicyError("manifest signature required (or ALLOW_UNSIGNED_MANIFESTS=true in dev)")

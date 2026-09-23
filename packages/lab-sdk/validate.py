@@ -26,6 +26,7 @@ for f in found:
         if t.get("privileged"):
             errors.append(f"{f}: privileged forbidden")
     # v0.2 optional blocks — validate shape when present
+    third = bool((data.get("origin") or {}).get("thirdParty"))
     if "blueTeam" in data and "detectionGoal" not in data["blueTeam"]:
         errors.append(f"{f}: blueTeam.detectionGoal required when blueTeam present")
     if "tutorPolicy" in data and "assessmentDiscloses" not in data["tutorPolicy"]:
@@ -51,8 +52,18 @@ for f in found:
     for o in data.get("objectives", []):
         if "evidenceRequired" not in o:
             errors.append(f"{f}: objective {o.get('id')}: evidenceRequired required")
-        if not isinstance((o.get("flag") or {}).get("objectiveId"), str):
-            errors.append(f"{f}: objective {o.get('id')}: server-side flag.objectiveId required")
+        has_flag = isinstance((o.get("flag") or {}).get("objectiveId"), str)
+        if not has_flag and not third:
+            errors.append(f"{f}: objective {o.get('id')}: server-side flag.objectiveId required (or thirdParty origin)")
+        if has_flag and not isinstance((o.get("flag") or {}).get("objectiveId"), str):
+            errors.append(f"{f}: objective {o.get('id')}: malformed flag block")
+    if third:
+        for k in ("project", "upstream", "license", "upstreamRef", "reviewed", "distinction"):
+            if not (data.get("origin") or {}).get(k):
+                errors.append(f"{f}: origin.{k} required for third-party wrappers")
+    for t in data.get("targets", []):
+        if t.get("writableFs") and not (third and isinstance(t.get("exception"), str) and t["exception"].strip()):
+            errors.append(f"{f}: target {t.get('name')}: writableFs needs thirdParty origin + written exception")
 if errors:
     print("\n".join(errors)); sys.exit(1)
 print(f"manifests OK ({len(found)} labs)")

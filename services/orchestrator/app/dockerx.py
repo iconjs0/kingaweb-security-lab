@@ -37,11 +37,14 @@ def run_target(cli, sid: str, net, target: dict, resources: dict | None = None,
     # Low-level create: the high-level run() drops networking_config when
     # network= is also passed.
     res = resources or {}
+    # Curated-only opt-out (policy enforces origin + written exception).
+    # First-party images always run read-only.
+    writable = bool(target.get("writableFs", False))
     hostcfg = cli.api.create_host_config(
         mem_limit=parse_mem(res.get("memory", "256m")),
         nano_cpus=int(float(res.get("cpu", "0.5")) * 1e9),
         pids_limit=res.get("pids", 64),
-        read_only=True,
+        read_only=not writable,
         tmpfs={"/tmp": "size=64m,mode=1777"},
         cap_drop=["ALL"],
         security_opt=["no-new-privileges"],
