@@ -1,0 +1,48 @@
+apiVersion: lab.kingaweb.io/v1
+kind: Lab
+metadata:
+  id: web-upload-01
+  slug: web-upload-01
+  version: 0.1.0
+  title: "Uploads: The SVG That Ran"
+  summary: "Upload a scripted SVG served as image, then gate types and sniffing."
+  difficulty: intermediate
+  timeMinutes: 45
+  author: "platform"
+  reviewer: "tbd"
+tracks: [web]
+owasp:
+  web: ["A03:2021-Injection", "A04:2021-Insecure Design"]
+  api: []
+cwe: [434, 79]
+prerequisites: [web-xss-01]
+topology: "single container: avatar host (stdlib python, /tmp uploads)"
+targets:
+  - name: avatars
+    image: "local/kingaweb-web-upload-01@sha256:LOCAL_BUILD"
+    ports: [8080]
+    healthcheck: { path: /healthz, port: 8080, timeoutSeconds: 5 }
+    resources: { cpu: "0.25", memory: "128Mi", pids: 32, diskMb: 128 }
+    readonlyFs: true
+network: { egress: deny, allowMocks: [] }
+session: { ttlMinutes: 45, maxExtendOnceMinutes: 15 }
+objectives:
+  - id: upload-xss
+    title: "Serve a live SVG marker, claim /flag?marker="
+    flag: { validator: hmac, objectiveId: upload-xss }
+    evidenceRequired: true
+hints:
+  - { level: 1, text: "Upload accepts JSON filename+base64. Which extensions survive?...", cost: 5 }
+  - { level: 2, text: "Upload evil.svg with <script>MARKER</script>, fetch it raw...", cost: 15 }
+guidedSteps:
+  - { checkpoint: map, title: "Accept", body: "Upload a png; note served content-type." }
+  - { checkpoint: test, title: "Smuggle", body: "Upload scripted SVG; claim the flag." }
+  - { checkpoint: fix, title: "Remediate", body: "Type allowlist + nosniff + attachment; svg → 403." }
+remediation: { summary: "Allowlisted types, content sniffing off, sandbox/attachment serving.", retest: "SVG upload → 403; png serves with nosniff." }
+blueTeam:
+  logBundle: "blue-team.json"
+  detectionGoal: "Alert on script-bearing uploads served as images"
+  sampleQuerySplunk: 'index=lab uri="/avatar" (svg OR html) | stats count by src'
+tutorPolicy: { guidedMaxLevel: 2, challengeDiscloses: methodology-only, assessmentDiscloses: none }
+ctf: { basePoints: 400, floor: 100, firstBloodBonus: true }
+resetStrategy: recreate

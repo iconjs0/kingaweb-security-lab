@@ -1,0 +1,1 @@
+{"bundle": "web-upload-01 synthetic logs", "logs": [{"ts": "2026-09-22T10:00:01Z", "uri": "/avatar", "filename": "me.png", "status": 201}, {"ts": "2026-09-22T10:01:12Z", "uri": "/avatar", "filename": "evil.svg", "status": 201, "note": "SUSPICIOUS scriptable type"}], "splunk": "index=lab uri=\"/avatar\" (svg OR html) | stats count by src"}

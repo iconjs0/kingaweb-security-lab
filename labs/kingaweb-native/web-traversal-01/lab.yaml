@@ -1,0 +1,48 @@
+apiVersion: lab.kingaweb.io/v1
+kind: Lab
+metadata:
+  id: web-traversal-01
+  slug: web-traversal-01
+  version: 0.1.0
+  title: "Traversal: Walk Out of /files/"
+  summary: "Escape the file jail with ../, read the secret, then allowlist."
+  difficulty: beginner
+  timeMinutes: 30
+  author: "platform"
+  reviewer: "tbd"
+tracks: [web]
+owasp:
+  web: ["A01:2021-Broken Access Control"]
+  api: ["API3:2023-Broken Object Property Level Authorization"]
+cwe: [22]
+prerequisites: [web-http-01]
+topology: "single container: file server (stdlib python)"
+targets:
+  - name: fileserver
+    image: "local/kingaweb-web-traversal-01@sha256:LOCAL_BUILD"
+    ports: [8080]
+    healthcheck: { path: /healthz, port: 8080, timeoutSeconds: 5 }
+    resources: { cpu: "0.25", memory: "128Mi", pids: 32, diskMb: 128 }
+    readonlyFs: true
+network: { egress: deny, allowMocks: [] }
+session: { ttlMinutes: 30, maxExtendOnceMinutes: 15 }
+objectives:
+  - id: traverse-read
+    title: "Read secret.txt via ?name=../secret.txt"
+    flag: { validator: hmac, objectiveId: traverse-read }
+    evidenceRequired: true
+hints:
+  - { level: 1, text: "Only public.txt is listed. What resolves to the sibling file?...", cost: 5 }
+  - { level: 2, text: "Try ?name=../secret.txt...", cost: 10 }
+guidedSteps:
+  - { checkpoint: map, title: "List", body: "GET /healthz file list; fetch public.txt." }
+  - { checkpoint: test, title: "Escape", body: "Walk out with ../; capture the flag." }
+  - { checkpoint: fix, title: "Remediate", body: "Exact allowlist; traversal → 403." }
+remediation: { summary: "Canonicalize + allowlist; never join raw user paths.", retest: "../secret.txt → 403; public.txt works." }
+blueTeam:
+  logBundle: "blue-team.json"
+  detectionGoal: "Alert on dot-dot sequences in file parameters"
+  sampleQuerySplunk: 'index=lab uri="/files*" ("%2e%2e" OR "..") | stats count by src'
+tutorPolicy: { guidedMaxLevel: 2, challengeDiscloses: methodology-only, assessmentDiscloses: none }
+ctf: { basePoints: 300, floor: 100, firstBloodBonus: true }
+resetStrategy: recreate

@@ -1,0 +1,1 @@
+{"bundle": "web-traversal-01 synthetic logs", "logs": [{"ts": "2026-09-22T10:00:01Z", "uri": "/files", "name": "public.txt", "status": 200}, {"ts": "2026-09-22T10:01:12Z", "uri": "/files", "name": "../secret.txt", "status": 200, "note": "SUSPICIOUS traversal"}], "splunk": "index=lab uri=\"/files*\" (\"%2e%2e\" OR \"..\") | stats count by src"}

@@ -1,0 +1,48 @@
+apiVersion: lab.kingaweb.io/v1
+kind: Lab
+metadata:
+  id: web-csrf-01
+  slug: web-csrf-01
+  version: 0.1.0
+  title: "CSRF: The Transfer That Forged Itself"
+  summary: "Drive a victim's cookie-authed transfer cross-site, then bind a token."
+  difficulty: intermediate
+  timeMinutes: 45
+  author: "platform"
+  reviewer: "tbd"
+tracks: [web]
+owasp:
+  web: ["A01:2021-Broken Access Control"]
+  api: []
+cwe: [352]
+prerequisites: [web-cookies-01]
+topology: "single container: bank (stdlib python)"
+targets:
+  - name: bank
+    image: "local/kingaweb-web-csrf-01@sha256:LOCAL_BUILD"
+    ports: [8080]
+    healthcheck: { path: /healthz, port: 8080, timeoutSeconds: 5 }
+    resources: { cpu: "0.25", memory: "128Mi", pids: 32, diskMb: 128 }
+    readonlyFs: true
+network: { egress: deny, allowMocks: [] }
+session: { ttlMinutes: 45, maxExtendOnceMinutes: 15 }
+objectives:
+  - id: csrf-transfer
+    title: "Transfer 100+ to attacker on victim's session, take the flag"
+    flag: { validator: hmac, objectiveId: csrf-transfer }
+    evidenceRequired: true
+hints:
+  - { level: 1, text: "Login sets a cookie AND a csrf token. Which one does /transfer check?...", cost: 5 }
+  - { level: 2, text: "Replay the transfer with cookie only, no token...", cost: 15 }
+guidedSteps:
+  - { checkpoint: map, title: "Session", body: "Login victim/victim; record cookie + csrf token." }
+  - { checkpoint: test, title: "Forge", body: "Cross-site style POST with cookie only; capture the flag." }
+  - { checkpoint: fix, title: "Remediate", body: "Token-bound writes + SameSite; tokenless POST → 403." }
+remediation: { summary: "Per-session anti-CSRF tokens on state changes + SameSite cookies.", retest: "Tokenless transfer → 403; tokened transfer works." }
+blueTeam:
+  logBundle: "blue-team.json"
+  detectionGoal: "Alert on state changes missing CSRF tokens or cross-site referers"
+  sampleQuerySplunk: 'index=lab uri="/api/transfer" csrf_token=- | stats count by src'
+tutorPolicy: { guidedMaxLevel: 2, challengeDiscloses: methodology-only, assessmentDiscloses: none }
+ctf: { basePoints: 400, floor: 100, firstBloodBonus: true }
+resetStrategy: recreate

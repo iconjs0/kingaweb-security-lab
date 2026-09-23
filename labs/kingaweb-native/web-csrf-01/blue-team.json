@@ -1,0 +1,1 @@
+{"bundle": "web-csrf-01 synthetic logs", "logs": [{"ts": "2026-09-22T10:00:01Z", "uri": "/api/transfer", "status": 200}, {"ts": "2026-09-22T10:01:12Z", "uri": "/api/transfer", "csrf": "missing", "status": 200, "note": "SUSPICIOUS tokenless state change"}], "splunk": "index=lab uri=\"/api/transfer\" csrf_token=- | stats count by src"}
