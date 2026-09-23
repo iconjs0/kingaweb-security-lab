@@ -79,7 +79,8 @@ def provision(body: ProvisionIn, _=Depends(authed)):
             runtime, pinned, dev = resolve_image(t["image"])
             targets.append({"name": t["name"], "runtime_image": runtime,
                             "ports": t.get("ports", []), "health": t.get("healthcheck", {}),
-                            "resources": t.get("resources", {}), "dev_digest": dev})
+                            "resources": t.get("resources", {}), "dev_digest": dev,
+                            "writableFs": bool(t.get("writableFs", False))})
     except PolicyError as e:
         raise HTTPException(403, f"image rejected: {e}")
     try:
