@@ -93,6 +93,14 @@ def launch(body: LaunchIn, db: DBSession = Depends(get_db), user: User = Depends
         dup = db.query(Session).filter(Session.owner_id == user.id, Session.idempotency_key == idempotency_key).first()
         if dup:
             return {"id": dup.id, "deduplicated": True}
+    import os as _os
+    per_user = int(_os.environ.get("MAX_ACTIVE_PER_USER", "10"))
+    per_global = int(_os.environ.get("MAX_ACTIVE_GLOBAL", "200"))
+    mine = db.query(Session).filter(Session.owner_id == user.id, Session.status == "active").count()
+    if mine >= per_user:
+        raise HTTPException(429, f"session quota: {per_user} active per learner (destroy one first)")
+    if db.query(Session).filter(Session.status == "active").count() >= per_global:
+        raise HTTPException(429, "platform at capacity, try again shortly")
     sid = f"s-{uuid.uuid4().hex[:12]}"
     now = datetime.now(timezone.utc)
     s = Session(id=sid, owner_id=user.id, lab_slug=lab.slug, lab_version=lab.version,
@@ -671,6 +679,15 @@ def leaderboard(cid: str, db: DBSession = Depends(get_db), user: User = Depends(
     if c.frozen:
         return {"competition": cid, "frozen": True, "leaderboard": []}
     return {"competition": cid, "frozen": False, "leaderboard": [{"user": u, "points": p} for u, p in board]}
+
+# ---- metrics (admin): request counters, abuse signals ----
+@router.get("/v1/metrics")
+def metrics_view(db: DBSession = Depends(get_db), user: User = Depends(require_roles("platform-admin"))):
+    from .limits import metrics
+    active = db.query(Session).filter(Session.status == "active").count()
+    fails_1h = db.query(Audit).filter(Audit.action.like("submit.fail")).count()
+    return {"requests": metrics.get("requests", 0), "rate_limited": metrics.get("rate_limited", 0),
+            "active_sessions": active, "submit_fails_total": fails_1h}
 
 # ---- audit (admin) ----
 @router.get("/v1/audit")

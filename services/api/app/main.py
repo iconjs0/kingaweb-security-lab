@@ -6,6 +6,7 @@ from .db import Base, SessionLocal, engine
 from .models import User  # noqa: F401  (register tables)
 from .models import Team, Membership, Lab, Session, Submission, Competition, Enrollment, HintUnlock, Finding, Note, Assignment, AssignmentSubmit, Certificate, Audit  # noqa: F401
 from .routers import router
+from .limits import GuardMiddleware
 from .seed import seed_labs
 
 @asynccontextmanager
@@ -46,6 +47,7 @@ def find_labs_root() -> str:
     return os.path.join(os.getcwd(), "labs")
 
 app = FastAPI(title="KingaWeb Security Lab API", version="0.2.0", lifespan=lifespan)
+app.add_middleware(GuardMiddleware)
 app.include_router(router)
 
 @app.get("/healthz")
