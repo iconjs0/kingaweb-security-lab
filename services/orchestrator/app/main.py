@@ -112,7 +112,8 @@ def provision(body: ProvisionIn, _=Depends(authed)):
             health = t.get("health") or {}
             hpath = health.get("path", "/healthz")
             first_port = int(t["ports"][0]) if t.get("ports") else 80
-            timeout = max(10, min(300, int(health.get("timeoutSeconds", 30) or 30)))
+            # generous budget: cold images + bridge learning cost seconds
+            timeout = max(60, min(300, int(health.get("timeoutSeconds", 60) or 60)))
             if not dockerx.wait_ready(f"http://{ip}:{first_port}{hpath}", timeout_s=timeout):
                 raise RuntimeError(f"readiness failed for {t['name']}")
             # NOTE (local dev): relays bind 0.0.0.0 so the API container can reach
