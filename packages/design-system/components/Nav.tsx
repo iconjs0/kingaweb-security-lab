@@ -24,7 +24,9 @@ export function TopNav() {
         <span style={{ display: "flex", gap: 12, marginLeft: 12 }}>
           <a href="/labs">Catalogue</a>
           <a href="/workspace">Workspace</a>
+          <a href="/teams">Teams</a>
           <a href="/intel">Intel</a>
+          <a href="/verify">Verify</a>
           <a href="/gallery">Gallery</a>
         </span>
         <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
