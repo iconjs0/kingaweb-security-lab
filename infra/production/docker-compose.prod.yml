@@ -1,0 +1,23 @@
+# Production overlay: tightened guards, dev escapes forced off.
+# Usage: docker compose -f infra/local/docker-compose.yml -f infra/production/docker-compose.prod.yml up -d
+services:
+  api:
+    environment:
+      ALLOW_DEV_MINT: "false"
+      RATE_LIMIT_LOGIN_PER_MIN: "20"
+      RATE_LIMIT_LAUNCH_PER_MIN: "10"
+      RATE_LIMIT_SUBMIT_PER_MIN: "30"
+      MAX_ACTIVE_PER_USER: "3"
+      MAX_ACTIVE_GLOBAL: "50"
+  orchestrator:
+    environment:
+      ALLOW_UNSIGNED_MANIFESTS: "false"
+      ALLOW_DEV_DIGESTS: "false"
+  tutor-stub:
+    deploy:
+      resources:
+        limits: { cpus: "0.25", memory: 128M }
+  mpesa-mock:
+    deploy:
+      resources:
+        limits: { cpus: "0.25", memory: 128M }
