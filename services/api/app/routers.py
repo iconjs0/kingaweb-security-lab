@@ -14,7 +14,7 @@ from .auth import current_user, login_dev, require_roles
 from .db import get_db
 from . import orch as orch_client
 from .flags import flag_hash, mint_flag, new_seed_hex, score_solve, verify_flag
-from .models import Audit, Competition, Enrollment, Lab, Membership, Session, Submission, Team, User, HintUnlock, Finding, Note
+from .models import Audit, Competition, Enrollment, Lab, Membership, Session, Submission, Team, User, HintUnlock, Finding, Note, Assignment, AssignmentSubmit, Certificate
 
 router = APIRouter()
 _attempts: dict[str, list[float]] = {}  # session_id -> submit timestamps (rate limit)
@@ -504,6 +504,135 @@ def join_team(tid: str, db: DBSession = Depends(get_db), user: User = Depends(cu
         audit(db, user.id, "team.join", tid)
         db.commit()
     return {"team": tid, "member": user.email}
+
+def _member_or_403(db: DBSession, tid: str, user: User) -> Team:
+    t = db.query(Team).filter(Team.id == tid).first()
+    if not t:
+        raise HTTPException(404, "team not found")
+    if not db.query(Membership).filter(Membership.team_id == tid, Membership.user_id == user.id).first():
+        raise HTTPException(403, "not a team member")
+    return t
+
+@router.get("/v1/teams/{tid}")
+def team_detail(tid: str, db: DBSession = Depends(get_db), user: User = Depends(current_user)):
+    t = _member_or_403(db, tid, user)
+    members = [m.user_id for m in db.query(Membership).filter(Membership.team_id == tid).all()]
+    assigns = [{"id": a.id, "title": a.title, "labs": json.loads(a.labs_json),
+                "due_at": a.due_at.isoformat() if a.due_at else None}
+               for a in db.query(Assignment).filter(Assignment.team_id == tid).all()]
+    return {"id": t.id, "name": t.name, "members": members, "assignments": assigns}
+
+@router.get("/v1/teams/{tid}/progress")
+def team_progress(tid: str, db: DBSession = Depends(get_db), user: User = Depends(current_user)):
+    t = _member_or_403(db, tid, user)
+    out = []
+    for m in db.query(Membership).filter(Membership.team_id == tid).all():
+        subs = db.query(Submission).join(Session, Submission.session_id == Session.id
+                                         ).filter(Session.owner_id == m.user_id).all()
+        hints = sum(u.cost for u in db.query(HintUnlock).join(
+            Session, HintUnlock.session_id == Session.id).filter(Session.owner_id == m.user_id).all())
+        out.append({"user": m.user_id, "solves": sum(1 for x in subs if x.correct),
+                    "gross": sum(x.points for x in subs), "hint_cost": hints,
+                    "net": sum(x.points for x in subs) - hints, "attempts": len(subs)})
+    return {"team": t.id, "cohort": sorted(out, key=lambda r: r["net"], reverse=True)}
+
+# ---- assignments ----
+class AssignIn(BaseModel):
+    team_id: str
+    title: str
+    labs: list[str] = []
+    due_days: int = 7
+
+@router.post("/v1/assignments", status_code=201)
+def create_assignment(body: AssignIn, db: DBSession = Depends(get_db),
+                      user: User = Depends(require_roles("instructor", "platform-admin"))):
+    _member_or_403(db, body.team_id, user)
+    for lab in body.labs:
+        if "@" not in lab:
+            raise HTTPException(422, f"lab must be slug@version: {lab}")
+        lab_or_404(db, *lab.split("@", 1))
+    a = Assignment(id=f"a-{uuid.uuid4().hex[:8]}", team_id=body.team_id, title=body.title,
+                   labs_json=json.dumps(body.labs),
+                   due_at=datetime.now(timezone.utc) + timedelta(days=max(1, body.due_days)),
+                   owner_id=user.id)
+    db.add(a)
+    audit(db, user.id, "assignment.create", a.id)
+    db.commit()
+    return {"id": a.id, "title": a.title, "labs": body.labs}
+
+class AssignSubmitIn(BaseModel):
+    session_id: str
+
+@router.post("/v1/assignments/{aid}/submit")
+def submit_assignment(aid: str, body: AssignSubmitIn, db: DBSession = Depends(get_db),
+                      user: User = Depends(current_user)):
+    a = db.query(Assignment).filter(Assignment.id == aid).first()
+    if not a:
+        raise HTTPException(404, "assignment not found")
+    _member_or_403(db, a.team_id, user)
+    s = own_session(db, body.session_id, user)
+    if f"{s.lab_slug}@{s.lab_version}" not in json.loads(a.labs_json):
+        raise HTTPException(422, "session lab not in assignment")
+    if db.query(AssignmentSubmit).filter(AssignmentSubmit.assignment_id == aid,
+                                         AssignmentSubmit.user_id == user.id,
+                                         AssignmentSubmit.session_id == s.id).first():
+        return {"assignment": aid, "deduplicated": True}
+    db.add(AssignmentSubmit(assignment_id=aid, user_id=user.id, session_id=s.id))
+    audit(db, user.id, "assignment.submit", f"{aid}:{s.id}")
+    db.commit()
+    return {"assignment": aid, "session": s.id}
+
+# ---- certificates (verifiable by code lookup) ----
+class CertIn(BaseModel):
+    user_email: str
+    assignment_id: str | None = None
+    lab: str = ""
+
+@router.post("/v1/certificates/issue", status_code=201)
+def issue_certificate(body: CertIn, db: DBSession = Depends(get_db),
+                      user: User = Depends(require_roles("instructor", "platform-admin"))):
+    target = db.query(User).filter(User.email == body.user_email).first()
+    if not target:
+        raise HTTPException(404, "learner not found")
+    import hashlib as _hl
+    if body.assignment_id:
+        a = db.query(Assignment).filter(Assignment.id == body.assignment_id).first()
+        if not a:
+            raise HTTPException(404, "assignment not found")
+        _member_or_403(db, a.team_id, user)
+        sub = db.query(AssignmentSubmit).filter(AssignmentSubmit.assignment_id == a.id,
+                                                AssignmentSubmit.user_id == target.id).first()
+        if not sub:
+            raise HTTPException(422, "learner has no submission for this assignment")
+        pts = sum(x.points for x in db.query(Submission).filter(
+            Submission.session_id == sub.session_id, Submission.correct == 1).all())
+        lab = db.query(Session).filter(Session.id == sub.session_id).first()
+        labref = f"{lab.lab_slug}@{lab.lab_version}" if lab else ""
+    else:
+        subs = db.query(Submission).join(Session, Submission.session_id == Session.id).filter(
+            Session.owner_id == target.id, Submission.correct == 1).all()
+        if not subs:
+            raise HTTPException(422, "learner has no solves yet")
+        pts = sum(x.points for x in subs)
+        labref = body.lab or "multi-lab"
+    code = "KW-CERT-" + _hl.sha256(f"{target.id}:{body.assignment_id}:{pts}:{uuid.uuid4().hex}".encode()
+                                   ).hexdigest()[:12].upper()
+    db.add(Certificate(code=code, user_id=target.id, assignment_id=body.assignment_id or "",
+                       lab=labref, points=pts, issued_by=user.id))
+    audit(db, user.id, "certificate.issue", f"{code}:{target.email}")
+    db.commit()
+    return {"code": code, "learner": target.email, "points": pts, "lab": labref}
+
+@router.get("/v1/certificates/{code}")
+def verify_certificate(code: str, db: DBSession = Depends(get_db)):
+    cert = db.query(Certificate).filter(Certificate.code == code).first()
+    if not cert:
+        raise HTTPException(404, "unknown certificate")
+    learner = db.query(User).filter(User.id == cert.user_id).first()
+    return {"code": cert.code, "learner": learner.email if learner else cert.user_id,
+            "lab": cert.lab, "points": cert.points,
+            "issued_at": cert.created_at.isoformat() if cert.created_at else None,
+            "assignment": cert.assignment_id or None}
 
 # ---- competitions ----
 class CompIn(BaseModel):

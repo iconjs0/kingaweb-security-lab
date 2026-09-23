@@ -75,6 +75,34 @@ class Enrollment(Base):
     competition_id: Mapped[str] = mapped_column(String(64), index=True)
     user_id: Mapped[str] = mapped_column(String(64), index=True)
 
+class Assignment(Base):
+    __tablename__ = "assignments"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    team_id: Mapped[str] = mapped_column(String(64), index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    labs_json: Mapped[str] = mapped_column(Text, default="[]")  # ["slug@version"]
+    due_at: Mapped[str] = mapped_column(DateTime(timezone=True), nullable=True)
+    owner_id: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+class AssignmentSubmit(Base):
+    __tablename__ = "assignment_submits"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    assignment_id: Mapped[str] = mapped_column(String(64), index=True)
+    user_id: Mapped[str] = mapped_column(String(64), index=True)
+    session_id: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+class Certificate(Base):
+    __tablename__ = "certificates"
+    code: Mapped[str] = mapped_column(String(64), primary_key=True)  # KW-CERT-XXXX
+    user_id: Mapped[str] = mapped_column(String(64), index=True)
+    assignment_id: Mapped[str] = mapped_column(String(64))
+    lab: Mapped[str] = mapped_column(String(255), default="")
+    points: Mapped[int] = mapped_column(Integer, default=0)
+    issued_by: Mapped[str] = mapped_column(String(64), default="")
+    created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
 class HintUnlock(Base):
     __tablename__ = "hint_unlocks"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
