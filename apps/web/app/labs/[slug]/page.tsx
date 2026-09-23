@@ -14,6 +14,7 @@ export default async function LabDetail({ params }: { params: Promise<{ slug: st
         <p style={{ color: "var(--text-2)", marginTop: 0 }}>{lab.summary}</p>
         <div className="toolbar">
           <Badge tone={lab.difficulty === "beginner" ? "ok" : lab.difficulty === "intermediate" ? "warn" : "danger"}>{lab.difficulty}</Badge>
+          {lab.origin === "third-party" ? <Badge tone="warn">third-party</Badge> : <Badge tone="ok">native</Badge>}
           {lab.owasp.map((o) => <Badge key={o}>{o}</Badge>)}
           {lab.cwe.map((c) => <Badge key={c}>CWE-{c}</Badge>)}
           {lab.i18n?.sw && <Badge tone="ok">Kiswahili</Badge>}

@@ -21,6 +21,7 @@ export async function fetchLabs(): Promise<{ labs: Lab[]; live: boolean }> {
         slug: l.slug, version: l.version, title: l.title, summary: l.summary,
         track: l.track, owasp: [], cwe: [], difficulty: l.difficulty,
         timeMinutes: l.time_minutes, objectives: [],
+        origin: l.slug.startsWith("curated-") ? "third-party" : "native",
       })),
     };
   } catch {

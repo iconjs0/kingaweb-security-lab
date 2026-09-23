@@ -10,6 +10,7 @@ export type Lab = {
   timeMinutes: number;
   objectives: { id: string; title: string }[];
   i18n?: { en: boolean; sw: boolean };
+  origin?: "native" | "third-party";
 };
 
 /* Mirrors labs/ manifests (static fallback; API-driven when live). */
@@ -233,6 +234,22 @@ export const LABS: Lab[] = [
       { id: "forge-callback", title: "Forge STK callback without valid HMAC" },
     ],
     i18n: { en: true, sw: true },
+  },
+  {
+    slug: "curated-juice-shop",
+    version: "0.1.0",
+    title: "Curated: OWASP Juice Shop (Third-Party)",
+    summary: "Full Top-Ten playground, wrapped. Evidence-graded by instructors.",
+    track: "web",
+    owasp: ["A01:2021-Broken Access Control"],
+    cwe: [79],
+    difficulty: "intermediate",
+    timeMinutes: 120,
+    objectives: [
+      { id: "scoreboard-found", title: "Find the score board (evidence)" },
+      { id: "admin-login", title: "Admin login challenge (evidence)" },
+    ],
+    origin: "third-party",
   },
 ];
 
