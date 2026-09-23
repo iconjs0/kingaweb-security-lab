@@ -41,13 +41,23 @@ def sync_kev(raw: bytes | None = None) -> dict:
 
 def sync_epss(raw: bytes | None = None, max_rows: int = 0) -> dict:
     t0, n = time.time(), 0
+    c = db.conn()
     try:
-        data = raw if raw is not None else fetch(EPSS_URL, timeout=120)
-        if data[:2] == b"\x1f\x8b":
-            data = gzip.decompress(data)
-        lines = data.decode("utf-8", "replace").splitlines()
-        start = next((i for i, l in enumerate(lines[:5]) if l.startswith("cve,")), 0)
-        for row in csv.DictReader(lines[start:]):
+        try:
+            data = raw if raw is not None else fetch(EPSS_URL, timeout=300)
+            if data[:2] == b"\x1f\x8b":
+                data = gzip.decompress(data)
+            lines = data.decode("utf-8", "replace").splitlines()
+            start = next((i for i, l in enumerate(lines[:5]) if l.startswith("cve,")), 0)
+            rows = list(csv.DictReader(lines[start:]))
+        except Exception as e:
+            return {"feed": "epss", "records": n, "error": f"{type(e).__name__}: {e}"}
+        if max_rows:
+            rows = rows[:max_rows]
+        have = {r[0] for r in c.execute("SELECT cve FROM vulns").fetchall()}
+        labs_map = lab_map()
+        ins, upd = [], []
+        for row in rows:
             cve = (row.get("cve") or "").strip()
             try:
                 epss = float(row.get("epss") or 0)
@@ -55,26 +65,33 @@ def sync_epss(raw: bytes | None = None, max_rows: int = 0) -> dict:
                 continue
             if not cve:
                 continue
-            c = db.conn()
-            try:
-                old = c.execute("SELECT cvss, kev FROM vulns WHERE cve=?", (cve,)).fetchone()
-                if old:
-                    labs = json.loads((c.execute("SELECT labs FROM vulns WHERE cve=?", (cve,)).fetchone() or ["[]"])[0])
-                    c.execute("UPDATE vulns SET epss=?, priority=?, updated_at=? WHERE cve=?",
-                              (epss, priority(old["cvss"], bool(old["kev"]), epss, labs), time.time(), cve))
-                    c.commit()
-                else:
-                    db.upsert_vuln({"cve": cve, "epss": epss,
-                                    "priority": priority(0, False, epss, lab_map().get(cve, [])),
-                                    "labs": json.dumps(lab_map().get(cve, []))}, reason="epss-sync")
-                n += 1
-            finally:
-                c.close()
-            if max_rows and n >= max_rows:
-                break
+            n += 1
+            if cve in have:
+                upd.append((epss, cve))
+            else:
+                labs = labs_map.get(cve, [])
+                ins.append((cve, epss, priority(0, False, epss, labs), json.dumps(labs), time.time()))
+        # bulk update existing (priority recomputed from stored cvss/kev)
+        for cve_epss in upd:
+            c.execute("UPDATE vulns SET epss=?, priority=CAST(cvss AS REAL)+CASE WHEN kev THEN 3.0 ELSE 0 END+MIN(MAX(?,0),1)*2.0+(CASE WHEN labs!='[]' THEN 1.0 ELSE 0 END), updated_at=? WHERE cve=?",
+                      (cve_epss[0], cve_epss[0], time.time(), cve_epss[1]))
+        c.commit()
+        for chunk in (ins[i:i + 2000] for i in range(0, len(ins), 2000)):
+            c.executemany("INSERT OR IGNORE INTO vulns(cve,epss,priority,labs,updated_at) VALUES(?,?,?,?,?)", chunk)
+            c.commit()
+        # queue a single review note for top-epss newcomers instead of per-row
+        if ins:
+            top = sorted(ins, key=lambda r: -r[1])[:5]
+            for cve, epss, _, _, _ in top:
+                if not c.execute("SELECT id FROM review_queue WHERE cve=? AND status='open'", (cve,)).fetchone():
+                    c.execute("INSERT INTO review_queue(cve,reason,status,created_at) VALUES(?,?,?,?)",
+                              (cve, f"high EPSS {epss}", "open", time.time()))
+            c.commit()
         return {"feed": "epss", "records": n, "seconds": round(time.time() - t0, 1)}
     except Exception as e:
         return {"feed": "epss", "records": n, "error": f"{type(e).__name__}: {e}"}
+    finally:
+        c.close()
 
 def _cvss_of(vuln: dict) -> tuple[float, str]:
     best, sev = 0.0, "none"

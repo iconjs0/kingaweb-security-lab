@@ -54,9 +54,27 @@ class ReviewIn(BaseModel):
 def healthz():
     return {"ok": True, "service": "intelligence"}
 
-@app.post("/v1/intel/sync")
+@app.post("/v1/intel/sync", status_code=202)
 def trigger(_=Depends(authed_write)):
-    return sync.sync_all()
+    global _sync_thread
+    if _sync_thread and _sync_thread.is_alive():
+        return {"started": False, "reason": "sync already running"}
+    _sync_thread = threading.Thread(target=sync.sync_all, daemon=True)
+    _sync_thread.start()
+    return {"started": True}
+
+_sync_thread: threading.Thread | None = None
+
+@app.get("/v1/intel/sync/status")
+def sync_status(_=Depends(authed)):
+    c = db.conn()
+    try:
+        runs = [dict(r) for r in c.execute(
+            "SELECT feed,started,finished,records,error FROM sync_runs ORDER BY id DESC LIMIT 10").fetchall()]
+    finally:
+        c.close()
+    running = bool(_sync_thread and _sync_thread.is_alive())
+    return {"running": running, "runs": runs}
 
 @app.get("/v1/intel/sync/runs")
 def runs(_=Depends(authed)):
