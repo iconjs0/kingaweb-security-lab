@@ -34,8 +34,30 @@ for f in found:
     if "i18n" in data:
         base = f.parent
         for lang, rel in data["i18n"].items():
-            if not (base / rel).exists():
+            p = base / rel
+            if not p.exists():
                 errors.append(f"{f}: i18n.{lang} file missing: {rel}")
+                continue
+            try:
+                bundle = json.loads(p.read_text())
+            except Exception:
+                errors.append(f"{f}: i18n.{lang} invalid JSON: {rel}")
+                continue
+            for k in ("title", "summary", "objectives", "hints"):
+                if k not in bundle:
+                    errors.append(f"{f}: i18n.{lang} missing key: {k}")
+            if lang != "en" and "en" in (data.get("i18n") or {}):
+                enp = base / data["i18n"]["en"]
+                if enp.exists():
+                    try:
+                        en = json.loads(enp.read_text())
+                        for sect in ("objectives", "hints"):
+                            e_ids = [x.get("id", x.get("level")) for x in en.get(sect, [])]
+                            s_ids = [x.get("id", x.get("level")) for x in bundle.get(sect, [])]
+                            if e_ids != s_ids:
+                                errors.append(f"{f}: i18n.{lang} {sect} id/level mismatch vs en")
+                    except Exception:
+                        pass
     if "ctf" in data and "basePoints" not in data["ctf"]:
         errors.append(f"{f}: ctf.basePoints required when ctf present")
     # v0.3 learning blocks — publishable labs need the full learning loop

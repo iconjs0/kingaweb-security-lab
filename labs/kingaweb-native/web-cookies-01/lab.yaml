@@ -45,4 +45,5 @@ blueTeam:
   sampleQuerySplunk: 'index=lab uri="/admin" status=200 | stats count by user'
 tutorPolicy: { guidedMaxLevel: 2, challengeDiscloses: methodology-only, assessmentDiscloses: none }
 ctf: { basePoints: 350, floor: 100, firstBloodBonus: true }
+i18n: { en: "i18n/en.json", sw: "i18n/sw.json" }
 resetStrategy: recreate
