@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Blackbox: docker stack (postgres/redis/api/tutor/mpesa). Brings stack up if needed.
+# Blackbox: docker stack (postgres/redis/api/orchestrator/intel/tutor/mpesa). Brings stack up if needed.
 # Usage: ./scripts/blackbox/bb-docker.sh
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
