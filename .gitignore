@@ -5,6 +5,7 @@ dist/
 build/
 .next/
 out/
+/kingaweb-netlify-frontend.zip
 *.tsbuildinfo
 
 # python

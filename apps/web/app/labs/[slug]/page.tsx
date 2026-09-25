@@ -1,6 +1,13 @@
 import { notFound } from "next/navigation";
 import { Badge, CommandBlock, ObjectiveList, Panel } from "@kingaweb/design-system";
 import { getLab } from "../../../lib/labs";
+import { LABS } from "../../../lib/labs";
+
+export const dynamicParams = false;
+
+export function generateStaticParams() {
+  return LABS.map((lab) => ({ slug: lab.slug }));
+}
 
 export default async function LabDetail({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
