@@ -93,7 +93,11 @@ def provision(body: ProvisionIn, _=Depends(authed)):
     dockerx.destroy_session(cli, body.session_id)  # idempotent re-provision
     store.drop(body.session_id, "reprovision")  # closes any stale relays
     store.upsert(body.session_id, f"{body.lab_slug}@{body.lab_version}", ttl, [])
-    net = dockerx.create_network(cli, body.session_id)
+    try:
+        net = dockerx.create_network(cli, body.session_id)
+    except Exception as e:
+        store.drop(body.session_id, "provision-failed")
+        raise HTTPException(503, f"no network capacity (subnet pool exhausted?): {e}")
     exposed = []
     relays = []
     tenv = {"SESSION_ID": body.session_id, "SESSION_SEED": body.seed_hex,

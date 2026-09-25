@@ -60,8 +60,23 @@ def run_target(cli, sid: str, net, target: dict, resources: dict | None = None,
         host_config=hostcfg,
         networking_config=netcfg,
     )
-    cli.api.start(cc.get("Id"))
-    return cli.containers.get(cc.get("Id"))
+    cid = cc.get("Id")
+    try:
+        cli.api.start(cid)
+    except Exception:
+        # saturated daemons occasionally lose a fresh container between create
+        # and start (observed at 12-way concurrency). One retry, then fail loud.
+        import time as _t
+        _t.sleep(2)
+        try:
+            cli.api.start(cid)
+        except Exception:
+            try:
+                cli.api.remove_container(cid, force=True)
+            except Exception:
+                pass
+            raise
+    return cli.containers.get(cid)
 
 def container_ip(container, net_name: str) -> str | None:
     container.reload()
