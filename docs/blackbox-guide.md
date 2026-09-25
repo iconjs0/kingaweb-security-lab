@@ -16,6 +16,7 @@ Five self-serve scripts. No source reading required — they only use HTTP, `doc
 ./scripts/blackbox/bb-teams.sh                  # 10 classroom checks (teams, assignments, certs)
 ./scripts/blackbox/bb-curated.sh                # 9 wrapper checks (slow ~90s: upstream boot)
 ./scripts/blackbox/bb-prod.sh                   # 7 prod-posture checks (needs prod overlay up)
+./scripts/blackbox/bb-load.sh [users] [rounds]  # parallel soak, default 8x2 (~2 min)
 ./scripts/blackbox/bb-frontend.sh               # build + 7 routes + markers (or --skip-build)
 npm run validate                                # manifests + contracts + scoring
 python3 -m pytest labs/tests/ -q                # golden vuln/fixed regression (no docker)
