@@ -32,6 +32,64 @@ def lab_or_404(db: DBSession, slug: str, version: str | None = None) -> Lab:
         raise HTTPException(404, "lab not found")
     return lab
 
+def _labs_root() -> str:
+    import pathlib
+    env = os.environ.get("LABS_ROOT", "")
+    if env and os.path.exists(env):
+        return env
+    cur = pathlib.Path(__file__).resolve().parent.parent.parent.parent
+    for _ in range(6):
+        if (cur / "labs" / "kingaweb-native").exists():
+            return str(cur / "labs")
+        cur = cur.parent
+    return os.path.join(os.getcwd(), "labs")
+
+def _localized(lab: Lab, lang: str) -> dict:
+    """Overlay title/summary/objectives/hints from an i18n bundle; en/unknown falls back."""
+    base = {"title": lab.title, "summary": lab.summary,
+            "objectives": json.loads(lab.objectives_json),
+            "hints": [{"level": h["level"], "cost": h["cost"]}
+                      for h in json.loads(lab.hints_json or "[]")]}
+    if lang in ("", "en"):
+        return base
+    try:
+        mapping = json.loads(getattr(lab, "i18n_json", "{}") or "{}")
+    except Exception:
+        mapping = {}
+    rel = mapping.get(lang)
+    if not rel:
+        return base
+    slug = lab.slug
+    bundle = None
+    import pathlib
+    import yaml as _yaml
+    for f in pathlib.Path(_labs_root()).rglob("lab.yaml"):
+        try:
+            md = (_yaml.safe_load(f.read_text()) or {}).get("metadata", {})
+        except Exception:
+            continue
+        if md.get("slug") == slug and str(md.get("version")) == str(lab.version):
+            cand = f.parent / rel
+            if cand.exists():
+                try:
+                    bundle = json.loads(cand.read_text())
+                except Exception:
+                    pass
+            break
+    if not bundle:
+        return base
+    out = dict(base)
+    out["title"] = bundle.get("title", base["title"])
+    out["summary"] = bundle.get("summary", base["summary"])
+    if isinstance(bundle.get("objectives"), list):
+        out["objectives"] = bundle["objectives"]
+    if isinstance(bundle.get("hints"), list):
+        costs = {h["level"]: h["cost"] for h in json.loads(lab.hints_json or "[]")}
+        out["hints"] = bundle["hints"]
+        out["hint_levels"] = [{"level": h["level"], "cost": costs.get(h["level"], 0)} for h in bundle["hints"]]
+    out["lang"] = lang
+    return out
+
 def own_session(db: DBSession, sid: str, user: User) -> Session:
     s = db.query(Session).filter(Session.id == sid).first()
     if not s:
@@ -59,13 +117,15 @@ def list_labs(db: DBSession = Depends(get_db), user: User = Depends(current_user
     ]
 
 @router.get("/v1/labs/{slug}")
-def get_lab(slug: str, db: DBSession = Depends(get_db), user: User = Depends(current_user)):
+def get_lab(slug: str, lang: str = "en", db: DBSession = Depends(get_db), user: User = Depends(current_user)):
     l = lab_or_404(db, slug)
-    return {"slug": l.slug, "version": l.version, "title": l.title, "summary": l.summary,
+    loc = _localized(l, lang)
+    return {"slug": l.slug, "version": l.version, "title": loc["title"], "summary": loc["summary"],
             "track": l.track, "difficulty": l.difficulty, "time_minutes": l.time_minutes,
-            "ttl_minutes": l.ttl_minutes, "objectives": json.loads(l.objectives_json),
-            "targets": json.loads(l.targets_json),
-            "hint_levels": [{"level": h["level"], "cost": h["cost"]} for h in json.loads(l.hints_json or "[]")]}
+            "ttl_minutes": l.ttl_minutes, "objectives": loc["objectives"],
+            "targets": json.loads(l.targets_json), "lang": loc.get("lang", "en"),
+            "hint_levels": loc.get("hint_levels",
+                [{"level": h["level"], "cost": h["cost"]} for h in json.loads(l.hints_json or "[]")])}
 
 # ---- sessions ----
 MODES = ("guided", "challenge", "assessment", "demo")

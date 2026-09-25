@@ -28,6 +28,7 @@ async def lifespan(app: FastAPI):
     add_column("sessions", "mode", "TEXT DEFAULT 'guided'")
     add_column("sessions", "finalized", "INTEGER DEFAULT 0")
     add_column("labs", "hints_json", "TEXT DEFAULT '[]'")
+    add_column("labs", "i18n_json", "TEXT DEFAULT '{}'")
     db = SessionLocal()
     try:
         seed_labs(db, find_labs_root())

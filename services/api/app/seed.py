@@ -46,6 +46,7 @@ def seed_labs(db: DBSession, labs_root: str = "labs") -> int:
                 {"level": int(h.get("level", i + 1)), "text": h.get("text", ""),
                  "cost": int(h.get("cost", 0))}
                 for i, h in enumerate(d.get("hints", []))]),
+            i18n_json=json.dumps(d.get("i18n", {})),
         )
         if row:
             for k, v in vals.items():

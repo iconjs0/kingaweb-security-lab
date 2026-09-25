@@ -35,6 +35,7 @@ class Lab(Base):
     objectives_json: Mapped[str] = mapped_column(Text, default="[]")
     targets_json: Mapped[str] = mapped_column(Text, default="[]")
     hints_json: Mapped[str] = mapped_column(Text, default="[]")  # [{level,text,cost}]
+    i18n_json: Mapped[str] = mapped_column(Text, default="{}")  # {lang: relative-path}
 
 class Session(Base):
     __tablename__ = "sessions"
