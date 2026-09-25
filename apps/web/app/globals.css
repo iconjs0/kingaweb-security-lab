@@ -1,5 +1,12 @@
 @import "@kingaweb/design-system/tokens.css";
 
+body {
+  background-image:
+    radial-gradient(circle at 88% 4%, color-mix(in srgb, var(--accent) 8%, transparent) 0, transparent 28rem),
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-raise) 35%, transparent), transparent 22rem);
+  background-attachment: fixed;
+}
+
 .hero {
   display: grid;
   grid-template-columns: 1.2fr 0.8fr;
