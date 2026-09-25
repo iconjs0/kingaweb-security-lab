@@ -18,6 +18,7 @@ build api-bola-01
 build api-mass-01
 build api-jwt-01
 build api-ratelimit-01
+build api-graphql-01
 build web-csrf-01
 build web-traversal-01
 build web-upload-01

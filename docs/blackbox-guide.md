@@ -5,12 +5,12 @@ Five self-serve scripts. No source reading required — they only use HTTP, `doc
 ## 1-click runs (from repo root)
 
 ```bash
-./scripts/build-lab-images.sh                   # build 19 target images (root context for flag SDK)
+./scripts/build-lab-images.sh                   # build 20 target images (root context for flag SDK)
 ./scripts/blackbox/bb-docker.sh                 # stack: postgres/redis/api/tutor/mpesa
 ./scripts/blackbox/bb-api.sh                    # 21 API checks (auth, isolation, flags, SSRF, RBAC, policy)
 ./scripts/blackbox/bb-orchestrator.sh           # 2-learner isolation, relay lifecycle, policy refuse
 ./scripts/blackbox/bb-learning.sh               # 13 mode/hint/finalize checks (guided→assessment→demo)
-./scripts/blackbox/bb-curriculum.sh             # 18 solves with real per-session flags
+./scripts/blackbox/bb-curriculum.sh             # 20 solves with real per-session flags
 ./scripts/blackbox/bb-evidence.sh               # 13 findings/notes/report checks
 ./scripts/blackbox/bb-intel.sh                  # 11 KEV/EPSS/NVD sync + priority + review checks
 ./scripts/blackbox/bb-teams.sh                  # 10 classroom checks (teams, assignments, certs)

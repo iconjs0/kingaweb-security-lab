@@ -160,6 +160,21 @@ export const LABS: Lab[] = [
     objectives: [{ id: "abuse-redeem", title: "Redeem WELCOME10 five times" }],
   },
   {
+    slug: "api-graphql-01",
+    version: "0.1.0",
+    title: "API GraphQL: Field Authz + Query Cost",
+    summary: "Foreign ssn field and unbounded nesting, then gate both.",
+    track: "api",
+    owasp: ["API3:2023-Broken Property Authz"],
+    cwe: [639],
+    difficulty: "intermediate",
+    timeMinutes: 45,
+    objectives: [
+      { id: "graphql-ssn", title: "Read bob's ssn as alice" },
+      { id: "graphql-deep", title: "Depth-6 query succeeds" },
+    ],
+  },
+  {
     slug: "web-csrf-01",
     version: "0.1.0",
     title: "CSRF: The Transfer That Forged Itself",

