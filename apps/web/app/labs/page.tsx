@@ -3,8 +3,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Badge, LabTable, Panel } from "@kingaweb/design-system";
 import { LABS, type Lab } from "../../lib/labs";
 import { fetchLabs } from "../../lib/api";
+import { useLang } from "../../lib/i18n";
 
 export default function Catalogue() {
+  const { t } = useLang();
   const [q, setQ] = useState("");
   const [track, setTrack] = useState("all");
   const [difficulty, setDifficulty] = useState("all");
@@ -29,32 +31,31 @@ export default function Catalogue() {
   return (
     <div className="stack">
       <div>
-        <p className="kicker">Catalogue <Badge tone={live ? "ok" : undefined}>{live ? "live API" : "static fallback"}</Badge></p>
-        <h1 style={{ margin: "0 0 8px" }}>Labs</h1>
-        <p style={{ color: "var(--text-2)", marginTop: 0 }}>Filter by track, difficulty or tool. Full OWASP/API coverage lands across Phase 5.</p>
+        <p className="kicker">{t("catalogue")} <Badge tone={live ? "ok" : undefined}>{live ? t("live_api") : t("static_fallback")}</Badge></p>
+        <h1 style={{ margin: "0 0 8px" }}>{t("labs")}</h1>
       </div>
-      <Panel title="Filters">
+      <Panel title={t("search")}>
         <div className="toolbar" role="search">
-          <label className="mono" style={{ fontSize: "var(--fs-small)" }} htmlFor="q">Search</label>
+          <label className="mono" style={{ fontSize: "var(--fs-small)" }} htmlFor="q">{t("search")}</label>
           <input id="q" className="input" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="idor, bola, api…" style={{ maxWidth: 280 }} />
-          <label style={{ fontSize: "var(--fs-small)" }} htmlFor="track">Track</label>
+          <label style={{ fontSize: "var(--fs-small)" }} htmlFor="track">{t("track")}</label>
           <select id="track" className="input" value={track} onChange={(e) => setTrack(e.target.value)}>
-            <option value="all">All tracks</option>
+            <option value="all">{t("all_tracks")}</option>
             <option value="web">Web</option>
             <option value="api">API</option>
             <option value="tz-local">TZ-local</option>
           </select>
-          <label style={{ fontSize: "var(--fs-small)" }} htmlFor="diff">Difficulty</label>
+          <label style={{ fontSize: "var(--fs-small)" }} htmlFor="diff">{t("difficulty")}</label>
           <select id="diff" className="input" value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
-            <option value="all">All levels</option>
-            <option value="beginner">Beginner</option>
-            <option value="intermediate">Intermediate</option>
-            <option value="advanced">Advanced</option>
+            <option value="all">{t("all_levels")}</option>
+            <option value="beginner">{t("beginner")}</option>
+            <option value="intermediate">{t("intermediate")}</option>
+            <option value="advanced">{t("advanced")}</option>
           </select>
         </div>
       </Panel>
       <LabTable rows={rows} />
-      {rows.length === 0 && <p role="status">No labs match these filters.</p>}
+      {rows.length === 0 && <p role="status">{t("no_match")}</p>}
     </div>
   );
 }

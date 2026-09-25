@@ -33,25 +33,38 @@ export function ThemeToggle() {
   );
 }
 
-export function TopNav() {
+export type NavLabels = {
+  catalogue: string; workspace: string; teams: string;
+  intel: string; verify: string; gallery: string; signin: string;
+  skip: string;
+};
+
+const DEFAULT_LABELS: NavLabels = {
+  catalogue: "Catalogue", workspace: "Workspace", teams: "Teams",
+  intel: "Intel", verify: "Verify", gallery: "Gallery", signin: "Sign in",
+  skip: "Skip to content",
+};
+
+export function TopNav({ labels = DEFAULT_LABELS, extraActions }: { labels?: NavLabels; extraActions?: React.ReactNode }) {
   return (
     <header className="site-header">
-      <a className="skip-link" href="#main">Skip to content</a>
+      <a className="skip-link" href="#main">{labels.skip}</a>
       <nav className="top-nav" aria-label="Primary">
         <a className="nav-brand" href="/" aria-label="KingaWeb Security Lab home">
           KingaWeb <span style={{ color: "var(--accent)" }}>Security Lab</span>
         </a>
         <span className="nav-links">
-          <a href="/labs">Catalogue</a>
-          <a href="/workspace">Workspace</a>
-          <a href="/teams">Teams</a>
-          <a href="/intel">Intel</a>
-          <a href="/verify">Verify</a>
-          <a href="/gallery">Gallery</a>
+          <a href="/labs">{labels.catalogue}</a>
+          <a href="/workspace">{labels.workspace}</a>
+          <a href="/teams">{labels.teams}</a>
+          <a href="/intel">{labels.intel}</a>
+          <a href="/verify">{labels.verify}</a>
+          <a href="/gallery">{labels.gallery}</a>
         </span>
         <span className="nav-actions">
           <ThemeToggle />
-          <a className="btn btn-sm" href="/login">Sign in</a>
+          {extraActions}
+          <a className="btn btn-sm" href="/login">{labels.signin}</a>
         </span>
       </nav>
     </header>

@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useLang } from "../../lib/i18n";
 import { Badge, CommandBlock, FindingCard, ObjectiveList, Panel } from "@kingaweb/design-system";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -101,6 +102,7 @@ function EvidenceKit({ sid }: { sid: string }) {
 }
 
 export default function Workspace() {
+  const { t } = useLang();
   const [method, setMethod] = useState("GET");
   const [path, setPath] = useState("/orders/102");
   const [sent, setSent] = useState<string | null>(null);
@@ -122,25 +124,25 @@ export default function Workspace() {
       </div>
       <div className="workspace">
         <div className="stack">
-          <Panel title="Brief" meta={<Badge>guided</Badge>}>
+          <Panel title={t("brief")} meta={<Badge>guided</Badge>}>
             <p style={{ marginTop: 0 }}>Enumerate order IDs and enforce server-side authorization. Document evidence for each objective.</p>
             <ObjectiveList items={[{ id: "read-other-order", title: "Read another user's order", done: false }]} />
           </Panel>
-          <Panel title="Topology">
+          <Panel title={t("topology")}>
             <p className="mono" style={{ fontSize: "var(--fs-small)" }}>browser → api → session-net → shop:8080 (read-only fs, no egress)</p>
           </Panel>
-          <Panel title="Hints (live)">
+          <Panel title={t("hints")}>
             <HintUnlocker sid={sid} />
           </Panel>
         </div>
         <div className="stack">
-          <Panel title="Target access" meta={<Badge tone="ok">session-net</Badge>}>
+          <Panel title={t("target_access")} meta={<Badge tone="ok">session-net</Badge>}>
             <div className="stack">
               <CommandBlock title="Burp upstream proxy" command="127.0.0.1:8080 → session-target:8080 (short-lived token in Phase 3)" />
               <CommandBlock title="curl" command="curl -s http://session-target:8080/orders/102 -H 'Cookie: session=…'" />
             </div>
           </Panel>
-          <Panel title="HTTP console (safe)">
+          <Panel title={t("http_console")}>
             <form
               onSubmit={(e) => { e.preventDefault(); setSent(`${method} ${path} → 200 (mock, Phase 7 proxies via API)`); }}
               aria-describedby="console-note"
@@ -170,10 +172,10 @@ export default function Workspace() {
           />
         </div>
         <div className="stack">
-          <Panel title="Notes & findings (live)">
+          <Panel title={t("notes_findings")}>
             <EvidenceKit sid={sid} />
           </Panel>
-          <Panel title="Report">
+          <Panel title={t("report")}>
             <p style={{ fontSize: "var(--fs-small)", color: "var(--text-2)" }}>HTML for print-to-PDF + machine JSON, per session.</p>
           </Panel>
         </div>
