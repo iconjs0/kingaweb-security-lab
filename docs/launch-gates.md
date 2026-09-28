@@ -17,6 +17,8 @@ Staged release. No stage advances with failing blackbox or open review items.
 2. No `change-me` secrets (`check-env.sh`).
 3. Backups restorable (documented drill output).
 4. Pentest before public (report filed; retest closed).
+5. OIDC issuer/audience configured; `ALLOW_DEV_AUTH=false`; only the exact
+   HTTPS frontend origin appears in `CORS_ALLOWED_ORIGINS`.
 
 ## K8s notes (when leaving compose)
 

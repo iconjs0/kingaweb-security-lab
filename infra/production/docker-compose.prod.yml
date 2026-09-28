@@ -4,6 +4,7 @@ services:
   api:
     environment:
       ALLOW_DEV_MINT: "false"
+      ALLOW_DEV_AUTH: "false"
       RATE_LIMIT_LOGIN_PER_MIN: "20"
       RATE_LIMIT_LAUNCH_PER_MIN: "10"
       RATE_LIMIT_SUBMIT_PER_MIN: "30"

@@ -2,6 +2,7 @@
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from .db import Base, SessionLocal, engine
 from .models import User  # noqa: F401  (register tables)
 from .models import Team, Membership, Lab, Session, Submission, Competition, Enrollment, HintUnlock, Finding, Note, Assignment, AssignmentSubmit, Certificate, Audit  # noqa: F401
@@ -48,6 +49,20 @@ def find_labs_root() -> str:
     return os.path.join(os.getcwd(), "labs")
 
 app = FastAPI(title="KingaWeb Security Lab API", version="0.2.0", lifespan=lifespan)
+cors_origins = [
+    origin.strip().rstrip("/")
+    for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+if cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
+        max_age=600,
+    )
 app.add_middleware(GuardMiddleware)
 app.include_router(router)
 

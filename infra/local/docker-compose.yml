@@ -40,6 +40,7 @@ services:
       POSTGRES_URL: postgresql://lab:lab_dev_only@postgres:5432/lab
       FLAG_HMAC_SECRET: ${FLAG_HMAC_SECRET:?set FLAG_HMAC_SECRET in .env}
       ALLOW_DEV_MINT: "true" # local only — production overlay forces false
+      ALLOW_DEV_AUTH: "true" # local identities only — production overlay forces false
       LABS_ROOT: /labs
       ORCHESTRATOR_URL: http://host.docker.internal:8001
       ORCHESTRATOR_TOKEN: ${ORCHESTRATOR_TOKEN:?set ORCHESTRATOR_TOKEN in .env}
