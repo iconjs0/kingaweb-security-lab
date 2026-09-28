@@ -1,26 +1,22 @@
 "use client";
 import { useState } from "react";
 import { Badge, Panel } from "@kingaweb/design-system";
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-const TOKEN = process.env.NEXT_PUBLIC_DEV_TOKEN ?? "dev-learner";
-
-async function call(path: string, opts?: RequestInit) {
-  const r = await fetch(`${API}${path}`, {
-    ...opts,
-    headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json", ...(opts?.headers || {}) },
-  });
-  if (!r.ok) throw new Error(`${r.status}: ${JSON.stringify(await r.json()).slice(0, 200)}`);
-  return r.json();
-}
+import { ProtectedPage, useAuth } from "../../lib/auth";
 
 export default function Teams() {
+  const { apiFetch } = useAuth();
   const [tid, setTid] = useState("");
   const [name, setName] = useState("");
   const [detail, setDetail] = useState<any>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [sid, setSid] = useState("");
   const [aid, setAid] = useState("");
+
+  async function call(path: string, opts?: RequestInit) {
+    const r = await apiFetch(path, opts);
+    if (!r.ok) throw new Error(`${r.status}: ${JSON.stringify(await r.json()).slice(0, 200)}`);
+    return r.json();
+  }
 
   async function wrap(fn: () => Promise<void>) {
     try { await fn(); } catch (e) { setMsg(`Failed: ${e}`); }
@@ -56,11 +52,11 @@ export default function Teams() {
     });
   }
   return (
-    <div className="stack">
+    <ProtectedPage><div className="stack">
       <div>
         <p className="kicker">Classroom</p>
         <h1 style={{ margin: "0 0 8px" }}>Teams & assignments</h1>
-        <p style={{ color: "var(--text-2)", marginTop: 0 }}>Dev token acts as the signed-in learner; instructors use the API directly for now.</p>
+        <p style={{ color: "var(--text-2)", marginTop: 0 }}>Create a study group, join a cohort and submit completed sessions under your signed-in identity.</p>
       </div>
       <Panel title="Team">
         <div className="toolbar">
@@ -101,6 +97,6 @@ export default function Teams() {
           </Panel>
         </>
       )}
-    </div>
+    </div></ProtectedPage>
   );
 }

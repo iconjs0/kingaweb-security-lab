@@ -2,20 +2,18 @@
 import { useState } from "react";
 import { useLang } from "../../lib/i18n";
 import { Badge, CommandBlock, FindingCard, ObjectiveList, Panel } from "@kingaweb/design-system";
+import { ProtectedPage, useAuth } from "../../lib/auth";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-const DEV_TOKEN = process.env.NEXT_PUBLIC_DEV_TOKEN ?? "dev-learner";
 
 function HintUnlocker({ sid }: { sid: string }) {
+  const { apiFetch } = useAuth();
   const [out, setOut] = useState<string | null>(null);
   async function unlock() {
     if (!sid) { setOut("Enter a session id first."); return; }
     setOut("Unlocking…");
     try {
-      const r = await fetch(`${API}/v1/sessions/${sid}/hints/unlock`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${DEV_TOKEN}` },
-      });
+      const r = await apiFetch(`/v1/sessions/${sid}/hints/unlock`, { method: "POST" });
       const j = await r.json();
       setOut(r.ok ? `Level ${j.level} (−${j.cost} pts): ${j.text}` : `Locked (${r.status}): ${j.detail ?? "no further hints"}`);
     } catch {
@@ -36,12 +34,13 @@ function HintUnlocker({ sid }: { sid: string }) {
 const FIELDS = ["title", "description", "evidence", "impact", "cwe", "remediation", "retest"] as const;
 
 function EvidenceKit({ sid }: { sid: string }) {
+  const { apiFetch } = useAuth();
   const [notes, setNotes] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [form, setForm] = useState<Record<string, string>>({ title: "", description: "", evidence: "", impact: "", cwe: "", remediation: "", retest: "" });
   const [findings, setFindings] = useState<{ id: number; title: string; severity: string }[]>([]);
   async function call(path: string, opts?: RequestInit) {
-    const r = await fetch(`${API}${path}`, { ...opts, headers: { Authorization: `Bearer ${DEV_TOKEN}`, "Content-Type": "application/json", ...(opts?.headers || {}) } });
+    const r = await apiFetch(path, opts);
     if (!r.ok) throw new Error(`${r.status}: ${JSON.stringify(await r.json()).slice(0, 160)}`);
     return r.json();
   }
@@ -108,7 +107,7 @@ export default function Workspace() {
   const [sent, setSent] = useState<string | null>(null);
   const [sid, setSid] = useState("");
   return (
-    <div className="stack">
+    <ProtectedPage><div className="stack">
       <div className="toolbar">
         <div>
           <p className="kicker" style={{ margin: 0 }}>Active session · web-idor-01@0.1.0</p>
@@ -180,6 +179,6 @@ export default function Workspace() {
           </Panel>
         </div>
       </div>
-    </div>
+    </div></ProtectedPage>
   );
 }

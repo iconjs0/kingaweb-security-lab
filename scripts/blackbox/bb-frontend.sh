@@ -7,6 +7,7 @@ PASS=0; FAIL=0
 ok()  { PASS=$((PASS+1)); echo "PASS: $1"; }
 bad() { FAIL=$((FAIL+1)); echo "FAIL: $1${2:+ — $2}"; }
 STARTED=0
+mkdir -p /tmp/opencode
 
 if [ "${1:-}" != "--skip-build" ]; then
   (npm run build --workspace=web > /tmp/opencode/bb-web-build.log 2>&1) || { echo "FAIL: web build (see /tmp/opencode/bb-web-build.log)"; exit 1; }
@@ -25,8 +26,8 @@ done
 code / > /dev/null;          has "Skip to content" && ok "skip link" || bad "skip link"
 code /gallery > /dev/null;   has "Component gallery" && has "LabTable" && ok "gallery documents components" || bad "gallery"
 code /labs > /dev/null;      has "mpesa-bola-01" && ok "catalogue lists TZ lab" || bad "catalogue content"
-code /workspace > /dev/null; has "HTTP console" && ok "workspace console panel" || bad "workspace"
-code /login > /dev/null;     has "acceptable-use" && ok "AUP consent on login" || bad "login AUP"
+code /workspace > /dev/null; has "Restoring secure session" && ok "workspace authentication shell" || bad "workspace authentication shell"
+code /login > /dev/null;     has "assigned, isolated session targets" && ok "AUP consent on login" || bad "login AUP"
 [ "$(code /labs/nope)" = "404" ] && ok "unknown slug 404" || bad "unknown slug"
 
 if [ "$STARTED" = "1" ]; then fuser -k 3000/tcp > /dev/null 2>&1; sleep 2; ok "server stopped"; fi

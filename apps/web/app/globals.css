@@ -59,3 +59,48 @@ body {
   color: var(--accent);
   font-weight: 700;
 }
+
+.signin-layout { display: grid; grid-template-columns: minmax(0, .82fr) minmax(440px, 1.18fr); gap: clamp(40px, 8vw, 112px); align-items: center; min-height: calc(100dvh - 190px); padding: 64px 0 88px; }
+.signin-intro h1, .access-gate h1, .signin-complete h1 { font-size: clamp(2.7rem, 5vw, 5.7rem); line-height: .94; letter-spacing: -.055em; margin: 18px 0 24px; max-width: 10ch; }
+.signin-intro .lede { max-width: 31rem; }
+.signin-facts { margin: 48px 0 0; display: grid; gap: 0; max-width: 32rem; }
+.signin-facts div { display: grid; grid-template-columns: 110px 1fr; gap: 20px; padding: 13px 0; border-bottom: 1px solid color-mix(in srgb, var(--line-1) 72%, transparent); }
+.signin-facts dt { color: var(--text-3); font-size: var(--fs-small); text-transform: uppercase; letter-spacing: .1em; }
+.signin-facts dd { margin: 0; font-family: var(--font-mono); font-size: var(--fs-small); }
+.signin-bezel { padding: 7px; border-radius: 30px; background: color-mix(in srgb, var(--bg-raise) 76%, var(--accent) 4%); box-shadow: 0 30px 90px color-mix(in srgb, var(--accent) 10%, transparent), inset 0 1px 0 color-mix(in srgb, white 10%, transparent); }
+.signin-card { border-radius: 24px; background: var(--bg-panel); padding: clamp(24px, 4vw, 42px); box-shadow: inset 0 1px 0 color-mix(in srgb, white 8%, transparent); }
+.signin-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; font-weight: 650; letter-spacing: -.01em; }
+.status-dot { color: var(--ok); font: 500 .7rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .1em; display: inline-flex; align-items: center; gap: 8px; }
+.status-dot::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 5px color-mix(in srgb, currentColor 11%, transparent); }
+.identity-list { border: 0; padding: 0; margin: 0; display: grid; gap: 9px; }
+.identity-list legend { color: var(--text-3); font-size: var(--fs-small); margin-bottom: 12px; }
+.identity-option { display: grid; grid-template-columns: auto 40px minmax(0, 1fr) auto; align-items: center; gap: 13px; padding: 13px 14px; border-radius: 15px; background: color-mix(in srgb, var(--bg-raise) 66%, transparent); outline: 1px solid color-mix(in srgb, var(--line-1) 70%, transparent); cursor: pointer; transition: transform 420ms cubic-bezier(.32,.72,0,1), background 420ms cubic-bezier(.32,.72,0,1), outline-color 420ms cubic-bezier(.32,.72,0,1); }
+.identity-option:hover { transform: translateY(-2px); }
+.identity-option[data-selected="true"] { background: color-mix(in srgb, var(--accent) 10%, var(--bg-panel)); outline-color: color-mix(in srgb, var(--accent) 58%, transparent); }
+.identity-option input { position: absolute; opacity: 0; pointer-events: none; }
+.identity-option:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.identity-mark { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 13%, var(--bg-raise)); color: var(--accent); font-family: var(--font-mono); font-weight: 600; }
+.identity-option strong, .identity-option small { display: block; }
+.identity-option small { color: var(--text-3); font-weight: 400; margin-top: 3px; line-height: 1.35; }
+.identity-role { color: var(--text-3); font-size: .68rem; }
+.aup-check { display: flex; gap: 10px; align-items: flex-start; margin: 24px 0 16px; color: var(--text-2); font-size: var(--fs-small); }
+.aup-check input { margin-top: 3px; accent-color: var(--accent); }
+.signin-submit { width: 100%; justify-content: space-between; border-radius: 999px; padding-left: 20px; }
+.signin-submit:disabled { opacity: .45; cursor: not-allowed; }
+.btn-orb { width: 30px; height: 30px; display: inline-grid; place-items: center; border-radius: 50%; background: color-mix(in srgb, currentColor 12%, transparent); transition: transform 420ms cubic-bezier(.32,.72,0,1); }
+.btn:hover .btn-orb { transform: translate(3px, -1px) scale(1.05); }
+.signin-note { color: var(--text-3); font-size: .75rem; line-height: 1.5; margin: 16px 0 0; }
+.auth-error { color: var(--danger); background: color-mix(in srgb, var(--danger) 9%, transparent); border-radius: 12px; padding: 10px 12px; font-size: var(--fs-small); }
+.access-gate, .signin-shell { max-width: 760px; margin: 10vh auto; padding: clamp(32px, 7vw, 72px); border-radius: 28px; background: var(--bg-panel); box-shadow: inset 0 1px 0 color-mix(in srgb, white 9%, transparent), 0 24px 80px color-mix(in srgb, var(--accent) 8%, transparent); }
+.access-gate p:not(.kicker) { color: var(--text-2); max-width: 40rem; margin-bottom: 28px; }
+.account-control { display: inline-flex; align-items: center; gap: 10px; padding: 5px 5px 5px 12px; border-radius: 999px; background: color-mix(in srgb, var(--bg-raise) 82%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--line-1) 75%, transparent); }
+.account-copy strong, .account-copy small { display: block; line-height: 1.1; }
+.account-copy strong { font-size: .75rem; }
+.account-copy small { color: var(--text-3); font: 500 .6rem/1.2 var(--font-mono); margin-top: 3px; }
+.account-exit { border: 0; width: 30px; height: 30px; border-radius: 50%; color: var(--text-1); background: color-mix(in srgb, var(--accent) 12%, var(--bg-panel)); cursor: pointer; transition: transform 420ms cubic-bezier(.32,.72,0,1); }
+.account-exit:hover { transform: rotate(-15deg); }
+.account-skeleton { width: 76px; height: 32px; border-radius: 999px; background: color-mix(in srgb, var(--bg-raise) 80%, transparent); }
+.auth-state { max-width: 420px; margin: 15vh auto; color: var(--text-2); text-align: center; }
+@media (max-width: 900px) { .signin-layout { grid-template-columns: 1fr; padding: 36px 0 64px; } .signin-intro h1 { font-size: clamp(2.7rem, 12vw, 4.8rem); } .signin-facts { margin-top: 32px; } }
+@media (max-width: 600px) { .signin-bezel { margin-inline: -8px; border-radius: 22px; } .signin-card { padding: 20px 16px; border-radius: 17px; } .identity-option { grid-template-columns: 36px minmax(0,1fr); } .identity-option input, .identity-role { display: none; } .identity-mark { width: 36px; height: 36px; } .account-copy { display: none; } .account-control { padding-left: 5px; } }
+@media (prefers-reduced-motion: reduce) { .identity-option, .btn-orb, .account-exit { transition: none; } }

@@ -41,6 +41,7 @@ services:
       FLAG_HMAC_SECRET: ${FLAG_HMAC_SECRET:?set FLAG_HMAC_SECRET in .env}
       ALLOW_DEV_MINT: "true" # local only — production overlay forces false
       ALLOW_DEV_AUTH: "true" # local identities only — production overlay forces false
+      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
       LABS_ROOT: /labs
       ORCHESTRATOR_URL: http://host.docker.internal:8001
       ORCHESTRATOR_TOKEN: ${ORCHESTRATOR_TOKEN:?set ORCHESTRATOR_TOKEN in .env}

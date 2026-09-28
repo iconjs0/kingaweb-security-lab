@@ -45,7 +45,7 @@ const DEFAULT_LABELS: NavLabels = {
   skip: "Skip to content",
 };
 
-export function TopNav({ labels = DEFAULT_LABELS, extraActions }: { labels?: NavLabels; extraActions?: React.ReactNode }) {
+export function TopNav({ labels = DEFAULT_LABELS, extraActions, authAction }: { labels?: NavLabels; extraActions?: React.ReactNode; authAction?: React.ReactNode }) {
   return (
     <header className="site-header">
       <a className="skip-link" href="#main">{labels.skip}</a>
@@ -64,7 +64,7 @@ export function TopNav({ labels = DEFAULT_LABELS, extraActions }: { labels?: Nav
         <span className="nav-actions">
           <ThemeToggle />
           {extraActions}
-          <a className="btn btn-sm" href="/login">{labels.signin}</a>
+          {authAction ?? <a className="btn btn-sm" href="/login">{labels.signin}</a>}
         </span>
       </nav>
     </header>

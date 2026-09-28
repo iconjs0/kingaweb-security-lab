@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Badge, Panel } from "@kingaweb/design-system";
+import { ProtectedPage } from "../../lib/auth";
 
 const BASE = process.env.NEXT_PUBLIC_INTEL_URL ?? "http://localhost:8002";
 const TOKEN = process.env.NEXT_PUBLIC_INTEL_TOKEN ?? "dev-intel-token";
@@ -42,7 +43,7 @@ export default function Intel() {
     load();
   }
   return (
-    <div className="stack">
+    <ProtectedPage roles={["instructor", "content-author", "platform-admin"]}><div className="stack">
       <div>
         <p className="kicker">Vulnerability intelligence</p>
         <h1 style={{ margin: "0 0 8px" }}>Priority, not noise</h1>
@@ -87,6 +88,6 @@ export default function Intel() {
           </ul>
         )}
       </Panel>
-    </div>
+    </div></ProtectedPage>
   );
 }
