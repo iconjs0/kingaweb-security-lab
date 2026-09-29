@@ -1,10 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLang } from "../../lib/i18n";
 import { Badge, CommandBlock, FindingCard, ObjectiveList, Panel } from "@kingaweb/design-system";
 import { ProtectedPage, useAuth } from "../../lib/auth";
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+import { LABS } from "../../lib/labs";
 
 function HintUnlocker({ sid }: { sid: string }) {
   const { apiFetch } = useAuth();
@@ -67,13 +66,27 @@ function EvidenceKit({ sid }: { sid: string }) {
       setMsg(`Finding #${f.id} recorded.`);
     } catch (e) { setMsg(`Rejected: ${e}`); }
   }
+  async function openReport(format: "html" | "json") {
+    if (!sid) { setMsg("Launch or enter a session first."); return; }
+    try {
+      const response = await apiFetch(`/v1/sessions/${sid}/report${format === "html" ? ".html" : ""}`);
+      if (!response.ok) throw new Error(`Report unavailable (${response.status})`);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      if (format === "html") window.open(url, "_blank", "noopener,noreferrer");
+      else {
+        const link = document.createElement("a"); link.href = url; link.download = `${sid}-report.json`; link.click();
+      }
+      window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    } catch (reason) { setMsg(reason instanceof Error ? reason.message : "Report unavailable"); }
+  }
   return (
     <div className="stack">
       <div className="toolbar">
         <button className="btn btn-sm" type="button" onClick={loadAll}>Load evidence</button>
         <span style={{ display: "flex", gap: 8 }}>
-          <a className="btn btn-sm" href={sid ? `${API}/v1/sessions/${sid}/report.html` : "#"}>HTML report</a>
-          <a className="btn btn-sm" href={sid ? `${API}/v1/sessions/${sid}/report` : "#"}>JSON</a>
+          <button className="btn btn-sm" type="button" onClick={() => openReport("html")}>HTML report</button>
+          <button className="btn btn-sm" type="button" onClick={() => openReport("json")}>JSON</button>
         </span>
       </div>
       {msg && <p role="status" style={{ fontSize: "var(--fs-small)", margin: 0 }}>{msg}</p>}
@@ -102,30 +115,74 @@ function EvidenceKit({ sid }: { sid: string }) {
 
 export default function Workspace() {
   const { t } = useLang();
+  const { user, apiFetch } = useAuth();
   const [method, setMethod] = useState("GET");
   const [path, setPath] = useState("/orders/102");
   const [sent, setSent] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
   const [sid, setSid] = useState("");
+  const [session, setSession] = useState<{ id: string; lab: string; status: string; mode: string; expires_at: string | null; targets: { name: string; url?: string; host?: string; port?: number }[] } | null>(null);
+  const [sessionMsg, setSessionMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    const queryId = new URLSearchParams(window.location.search).get("session");
+    const savedId = window.sessionStorage.getItem("kingaweb-active-session");
+    if (queryId || savedId) setSid(queryId || savedId || "");
+  }, []);
+  useEffect(() => {
+    if (!user || !sid) return;
+    apiFetch(`/v1/sessions/${sid}`).then(async (response) => {
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.detail ?? `Session load failed (${response.status})`);
+      setSession(body); setSessionMsg(null);
+    }).catch((reason) => { setSession(null); setSessionMsg(reason instanceof Error ? reason.message : "Session unavailable"); });
+  }, [user, sid, apiFetch]);
+
+  async function sessionAction(action: "extend" | "reset") {
+    if (!sid) return;
+    setSessionMsg(action === "extend" ? "Extending session…" : "Resetting isolated environment…");
+    try {
+      const response = await apiFetch(`/v1/sessions/${sid}/${action}`, { method: "POST" });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.detail ?? `${action} failed (${response.status})`);
+      const refreshed = await apiFetch(`/v1/sessions/${sid}`);
+      setSession(await refreshed.json()); setSessionMsg(action === "extend" ? "Session extended by 30 minutes." : "Environment reset and flags rotated.");
+    } catch (reason) { setSessionMsg(reason instanceof Error ? reason.message : `${action} failed`); }
+  }
+  const target = session?.targets?.[0];
+  const activeLab = LABS.find((lab) => lab.slug === session?.lab.split("@")[0]);
+  async function sendRequest() {
+    if (!sid || !target) { setSent("Launch a session before using the console."); return; }
+    setSending(true); setSent("Sending through the session allowlist…");
+    try {
+      const headers = target.port ? { "X-Relay-Port": String(target.port) } : {};
+      const response = await apiFetch(`/v1/sessions/${sid}/requests`, { method: "POST", body: JSON.stringify({ method, host: target.host ?? "shop", path, headers }) });
+      const body = await response.json().catch(() => ({}));
+      setSent(response.ok ? `${method} ${path} → ${body.status}\n${body.body ?? ""}` : `Blocked (${response.status}): ${body.detail ?? "request rejected"}`);
+    } catch (reason) { setSent(reason instanceof Error ? reason.message : "Request failed"); }
+    finally { setSending(false); }
+  }
   return (
     <ProtectedPage><div className="stack">
       <div className="toolbar">
         <div>
-          <p className="kicker" style={{ margin: 0 }}>Active session · web-idor-01@0.1.0</p>
+          <p className="kicker" style={{ margin: 0 }}>{session ? `${session.status} session · ${session.lab}` : "Session workspace"}</p>
           <h1 style={{ margin: "0 0 4px" }}>Workspace</h1>
         </div>
         <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
           <label className="mono" style={{ fontSize: "var(--fs-small)" }} htmlFor="ws-sid">Session</label>
           <input id="ws-sid" className="input mono" value={sid} onChange={(e) => setSid(e.target.value)} placeholder="s-…" style={{ maxWidth: 150 }} />
-          <Badge tone="ok">expires 42:10</Badge>
-          <button className="btn btn-sm" type="button">Extend</button>
-          <button className="btn btn-sm" type="button">Reset</button>
+          {session && <Badge tone="ok">{session.mode}</Badge>}
+          <button className="btn btn-sm" type="button" disabled={!session} onClick={() => sessionAction("extend")}>Extend</button>
+          <button className="btn btn-sm" type="button" disabled={!session} onClick={() => sessionAction("reset")}>Reset</button>
         </span>
       </div>
+      {sessionMsg && <p className="workspace-notice" role="status">{sessionMsg}</p>}
       <div className="workspace">
         <div className="stack">
-          <Panel title={t("brief")} meta={<Badge>guided</Badge>}>
-            <p style={{ marginTop: 0 }}>Enumerate order IDs and enforce server-side authorization. Document evidence for each objective.</p>
-            <ObjectiveList items={[{ id: "read-other-order", title: "Read another user's order", done: false }]} />
+          <Panel title={t("brief")} meta={<Badge>{session?.mode ?? "waiting"}</Badge>}>
+            <p style={{ marginTop: 0 }}>{activeLab?.summary ?? "Launch or load a session to view its brief and objectives."}</p>
+            <ObjectiveList items={(activeLab?.objectives ?? []).map((objective) => ({ ...objective, done: false }))} />
           </Panel>
           <Panel title={t("topology")}>
             <p className="mono" style={{ fontSize: "var(--fs-small)" }}>browser → api → session-net → shop:8080 (read-only fs, no egress)</p>
@@ -137,13 +194,13 @@ export default function Workspace() {
         <div className="stack">
           <Panel title={t("target_access")} meta={<Badge tone="ok">session-net</Badge>}>
             <div className="stack">
-              <CommandBlock title="Burp upstream proxy" command="127.0.0.1:8080 → session-target:8080 (short-lived token in Phase 3)" />
-              <CommandBlock title="curl" command="curl -s http://session-target:8080/orders/102 -H 'Cookie: session=…'" />
+              <CommandBlock title="Assigned target" command={target?.url ?? (target?.host && target?.port ? `http://${target.host}:${target.port}` : "Launch a session to receive an isolated target.")} />
+              <CommandBlock title="curl" command={target?.url ? `curl -s ${target.url}` : "curl -s http://assigned-session-target/"} />
             </div>
           </Panel>
           <Panel title={t("http_console")}>
             <form
-              onSubmit={(e) => { e.preventDefault(); setSent(`${method} ${path} → 200 (mock, Phase 7 proxies via API)`); }}
+              onSubmit={(e) => { e.preventDefault(); sendRequest(); }}
               aria-describedby="console-note"
             >
               <div className="toolbar">
@@ -153,10 +210,10 @@ export default function Workspace() {
                 </select>
                 <label style={{ fontSize: "var(--fs-small)" }} htmlFor="p">Path</label>
                 <input id="p" className="input" value={path} onChange={(e) => setPath(e.target.value)} style={{ flex: 1, minWidth: 160 }} />
-                <button className="btn btn-primary btn-sm" type="submit">Send</button>
+                <button className="btn btn-primary btn-sm" type="submit" disabled={sending}>{sending ? "Sending…" : "Send"}</button>
               </div>
               <p id="console-note" style={{ fontSize: "var(--fs-small)", color: "var(--text-2)" }}>
-                Allowlisted to your assigned target only; timeouts and size limits enforced server-side in Phase 7.
+                Requests are allowlisted to the assigned target; server-side timeouts and response limits are enforced.
               </p>
             </form>
             {sent && <div className="cmd" role="status"><pre>{sent}</pre></div>}

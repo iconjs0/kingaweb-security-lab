@@ -26,6 +26,7 @@ done
 code / > /dev/null;          has "Skip to content" && ok "skip link" || bad "skip link"
 code /gallery > /dev/null;   has "Component gallery" && has "LabTable" && ok "gallery documents components" || bad "gallery"
 code /labs > /dev/null;      has "mpesa-bola-01" && ok "catalogue lists TZ lab" || bad "catalogue content"
+code /labs/web-http-01 > /dev/null; has "Authorization checkpoint" && has "Sign in to launch" && ok "lab launch checkpoint" || bad "lab launch checkpoint"
 code /workspace > /dev/null; has "Restoring secure session" && ok "workspace authentication shell" || bad "workspace authentication shell"
 code /login > /dev/null;     has "assigned, isolated session targets" && ok "AUP consent on login" || bad "login AUP"
 [ "$(code /labs/nope)" = "404" ] && ok "unknown slug 404" || bad "unknown slug"

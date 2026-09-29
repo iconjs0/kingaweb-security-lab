@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
-import { Badge, CommandBlock, ObjectiveList, Panel } from "@kingaweb/design-system";
+import { Badge, ObjectiveList, Panel } from "@kingaweb/design-system";
 import { getLab } from "../../../lib/labs";
 import { LABS } from "../../../lib/labs";
+import { LaunchPanel } from "../../../components/LaunchPanel";
 
 export const dynamicParams = false;
 
@@ -27,20 +28,13 @@ export default async function LabDetail({ params }: { params: Promise<{ slug: st
           {lab.i18n?.sw && <Badge tone="ok">Kiswahili</Badge>}
         </div>
       </div>
-      <div className="grid-2">
+      <div className="lab-detail-grid">
         <Panel title="Learning objectives">
           <ObjectiveList items={lab.objectives.map((o) => ({ ...o, done: false }))} />
         </Panel>
-        <Panel title="Launch (Phase 2)">
-          <div className="stack">
-            <CommandBlock title="curl" command={`curl -X POST /v1/sessions -H 'Content-Type: application/json' -d '{"lab":"${lab.slug}@${lab.version}"}'`} />
-            <div className="toolbar">
-              <a className="btn btn-primary" href="/workspace">Open workspace</a>
-              <a className="btn" href="/labs">Back to catalogue</a>
-            </div>
-          </div>
-        </Panel>
+        <aside className="lab-guardrails"><p className="kicker">Runtime policy</p><dl><div><dt>Network</dt><dd>Per-session isolation</dd></div><div><dt>Egress</dt><dd>Denied by default</dd></div><div><dt>Storage</dt><dd>Ephemeral</dd></div><div><dt>Flags</dt><dd>Session-bound HMAC</dd></div></dl><a className="btn btn-sm" href="/labs">Back to catalogue</a></aside>
       </div>
+      <LaunchPanel slug={lab.slug} version={lab.version} minutes={lab.timeMinutes} />
     </div>
   );
 }
