@@ -20,7 +20,7 @@ code() { curl -s -o /tmp/opencode/bb-page.html -w "%{http_code}" "http://localho
 has()  { grep -q "$1" /tmp/opencode/bb-page.html; }
 
 echo "== frontend blackbox =="
-for p in / /login /labs /labs/web-idor-01 /labs/mpesa-bola-01 /workspace /gallery; do
+for p in / /login /labs /labs/web-idor-01 /labs/mpesa-bola-01 /sessions /workspace /gallery; do
   [ "$(code "$p")" = "200" ] && ok "GET $p 200" || bad "GET $p"
 done
 code / > /dev/null;          has "Skip to content" && ok "skip link" || bad "skip link"
@@ -28,6 +28,7 @@ code /gallery > /dev/null;   has "Component gallery" && has "LabTable" && ok "ga
 code /labs > /dev/null;      has "mpesa-bola-01" && ok "catalogue lists TZ lab" || bad "catalogue content"
 code /labs/web-http-01 > /dev/null; has "Authorization checkpoint" && has "Sign in to launch" && ok "lab launch checkpoint" || bad "lab launch checkpoint"
 code /workspace > /dev/null; has "Restoring secure session" && ok "workspace authentication shell" || bad "workspace authentication shell"
+code /sessions > /dev/null;  has "Restoring secure session" && ok "sessions authentication shell" || bad "sessions authentication shell"
 code /login > /dev/null;     has "assigned, isolated session targets" && ok "AUP consent on login" || bad "login AUP"
 [ "$(code /labs/nope)" = "404" ] && ok "unknown slug 404" || bad "unknown slug"
 

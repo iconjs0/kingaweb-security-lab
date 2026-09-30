@@ -138,6 +138,38 @@ class LaunchIn(BaseModel):
 def _targets_for(lab: Lab) -> list[dict]:
     return json.loads(lab.targets_json)
 
+@router.get("/v1/sessions")
+def list_sessions(status_filter: str = "all", limit: int = 50,
+                  db: DBSession = Depends(get_db), user: User = Depends(current_user)):
+    now = datetime.now(timezone.utc)
+    rows = db.query(Session).filter(Session.owner_id == user.id).order_by(Session.created_at.desc()).all()
+    out, counts = [], {"active": 0, "finalized": 0, "expired": 0, "destroyed": 0, "total": len(rows)}
+    for session in rows:
+        expires = session.expires_at
+        aware_expires = expires if not expires or expires.tzinfo else expires.replace(tzinfo=timezone.utc)
+        status_value = session.status
+        if status_value == "active" and aware_expires and aware_expires <= now:
+            status_value = "expired"
+        category = "finalized" if bool(getattr(session, "finalized", 0)) else status_value
+        if category in counts:
+            counts[category] += 1
+        if status_filter != "all" and category != status_filter:
+            continue
+        try:
+            target_count = len(json.loads(session.targets_json or "[]"))
+        except Exception:
+            target_count = 0
+        out.append({
+            "id": session.id, "lab": f"{session.lab_slug}@{session.lab_version}",
+            "status": status_value, "mode": getattr(session, "mode", "guided"),
+            "finalized": bool(getattr(session, "finalized", 0)),
+            "expires_at": expires.isoformat() if expires else None,
+            "created_at": session.created_at.isoformat() if session.created_at else None,
+            "target_count": target_count,
+        })
+    safe_limit = max(1, min(limit, 100))
+    return {"items": out[:safe_limit], "summary": counts, "showing": min(len(out), safe_limit)}
+
 @router.post("/v1/sessions", status_code=201)
 def launch(body: LaunchIn, db: DBSession = Depends(get_db), user: User = Depends(current_user),
            idempotency_key: str | None = Header(default=None, alias="Idempotency-Key")):

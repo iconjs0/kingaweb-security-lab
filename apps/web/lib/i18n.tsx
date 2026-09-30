@@ -5,6 +5,7 @@ export type Lang = "en" | "sw";
 
 const STRINGS: Record<string, { en: string; sw: string }> = {
   catalogue: { en: "Catalogue", sw: "Katalogi" },
+  sessions: { en: "Sessions", sw: "Vipindi" },
   labs: { en: "Labs", sw: "Maabara" },
   workspace: { en: "Workspace", sw: "Eneo la kazi" },
   teams: { en: "Teams", sw: "Timu" },

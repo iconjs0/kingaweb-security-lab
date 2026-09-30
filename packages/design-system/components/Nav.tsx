@@ -34,13 +34,13 @@ export function ThemeToggle() {
 }
 
 export type NavLabels = {
-  catalogue: string; workspace: string; teams: string;
+  catalogue: string; sessions: string; workspace: string; teams: string;
   intel: string; verify: string; gallery: string; signin: string;
   skip: string;
 };
 
 const DEFAULT_LABELS: NavLabels = {
-  catalogue: "Catalogue", workspace: "Workspace", teams: "Teams",
+  catalogue: "Catalogue", sessions: "Sessions", workspace: "Workspace", teams: "Teams",
   intel: "Intel", verify: "Verify", gallery: "Gallery", signin: "Sign in",
   skip: "Skip to content",
 };
@@ -55,6 +55,7 @@ export function TopNav({ labels = DEFAULT_LABELS, extraActions, authAction }: { 
         </a>
         <span className="nav-links">
           <a href="/labs">{labels.catalogue}</a>
+          <a href="/sessions">{labels.sessions}</a>
           <a href="/workspace">{labels.workspace}</a>
           <a href="/teams">{labels.teams}</a>
           <a href="/intel">{labels.intel}</a>

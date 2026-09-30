@@ -15,7 +15,7 @@ function TranslatedNav() {
   return (
     <TopNav
       labels={{
-        catalogue: t("catalogue"), workspace: t("workspace"), teams: t("teams"),
+        catalogue: t("catalogue"), sessions: t("sessions"), workspace: t("workspace"), teams: t("teams"),
         intel: t("intel"), verify: t("verify"), gallery: t("gallery"),
         signin: t("signin"), skip: t("skip"),
       }}

@@ -47,6 +47,10 @@ def test_session_isolation_and_idempotency():
     sid = r1.json()["id"]
     assert c.get(f"/v1/sessions/{sid}", headers=auth(b)).status_code == 403  # cross-user denied
     assert c.get(f"/v1/sessions/{sid}", headers=auth(a)).status_code == 200
+    mine = c.get("/v1/sessions", headers=auth(a))
+    assert mine.status_code == 200 and any(s["id"] == sid for s in mine.json()["items"])
+    others = c.get("/v1/sessions", headers=auth(b))
+    assert all(s["id"] != sid for s in others.json()["items"])
 
 def test_flag_roundtrip_and_ratelimit():
     t = token("learner@lab.dev")
